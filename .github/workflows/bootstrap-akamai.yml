@@ -106,7 +106,7 @@ jobs:
 
 
       - name: Upload EW bundle
-        if: ${{ steps.cfg.outputs.flag_upload_ew == 'true' }}
+        if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
           cd akamai/edgeworker
           tar -czvf ew-bundle.tar.gz --exclude='.*' *
@@ -120,5 +120,4 @@ jobs:
         run: |
           akamai edgeworkers activate "${{ steps.create_ew.outputs.ew_id }}" \
             staging --version 0.1 \
-            --section "${{ steps.cfg.outputs.section }}" \
             ${{ steps.acct.outputs.args }}
