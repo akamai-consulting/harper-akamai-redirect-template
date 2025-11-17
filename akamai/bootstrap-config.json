@@ -1,0 +1,30 @@
+{
+  "account": {
+    "contractId": "ctr_1-ABCD",
+    "groupId": "grp_12345",
+    "productId": "prd_SPM"        
+  },
+
+  "edgeworker": {
+    "create": true,
+    "name": "harper-redirector-ew",
+    "resourceTierId": 200
+  },
+
+  "property": {
+    "create": true,
+    "name": "",
+    "edgeHostname": "",
+    "cnameTarget": "",
+    "originHostname": ""
+  },
+
+  "routing": {
+    "harperRedirectBaseUrl": "https://harper.staging.example.com/checkredirect",
+    "sendHostHeader": "harper.staging.example.com"
+  },
+
+  "flags": {
+    "uploadRedirectCSV": true
+  }
+}

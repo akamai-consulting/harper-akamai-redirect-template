@@ -1,0 +1,15 @@
+{
+	"data": [
+		{
+			"utcStartTime": "",
+			"utcEndTime": "",
+			"path": "/shop/live-shopping",
+			"host": "",
+			"version": "0",
+			"redirectURL": "/s/events",
+			"operations": "",
+			"statusCode": "301",
+			"regex": 0
+		}
+	]
+}
