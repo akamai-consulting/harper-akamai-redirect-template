@@ -95,7 +95,7 @@ jobs:
             "${{ steps.cfg.outputs.groupId }}" \
             "${{ steps.cfg.outputs.ew_name }}" \
             --jsonout \
-            ${{ steps.acct.outputs.args }} > 1>"$OUT" 2>"$ERR"
+            ${{ steps.acct.outputs.args }} 1>"$OUT" 2>"$ERR"
 
           # Capture the numeric ID field from JSON
           EW_ID=$(jq -r '(.data[0].edgeWorkerId // .edgeWorkerId) // empty' "$OUT")
