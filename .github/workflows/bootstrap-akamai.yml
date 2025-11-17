@@ -22,7 +22,6 @@ jobs:
           sudo mv akamai /usr/local/bin/akamai
           akamai install edgeworkers
           akamai install property-manager
-          akamai install onboard
 
       - name: Configure Akamai CLI credentials
         run: |
