@@ -5,7 +5,6 @@ on:
 
 env:
   ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
-  AKAMAI_GROUP_ID: ${{ vars.AKAMAI_GROUP_ID }}
   AKAMAI_HOST: ${{ secrets.AKAMAI_HOST }}
   AKAMAI_CLIENT_TOKEN: ${{ secrets.AKAMAI_CLIENT_TOKEN }}
   AKAMAI_CLIENT_SECRET: ${{ secrets.AKAMAI_CLIENT_SECRET }}
@@ -88,7 +87,7 @@ jobs:
 
       - name: Create EdgeWorker (if no ID)
         id: create_ew
-        if: ${{ steps.cfg.outputs.flag_upload_ew == 'true' }}
+        if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
 
           RESPONSE=$(akamai edgeworkers create \
