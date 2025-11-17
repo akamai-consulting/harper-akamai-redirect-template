@@ -89,16 +89,16 @@ jobs:
         id: create_ew
         if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
-
+          OUT="$RUNNER_TEMP/ew.json"
           RESPONSE=$(akamai edgeworkers register \
             --resourceTierId "${{ steps.cfg.outputs.ew_tier }}" \
             "${{ steps.cfg.outputs.groupId }}" \
             "${{ steps.cfg.outputs.ew_name }}" \
             --jsonout \
-            ${{ steps.acct.outputs.args }})
+            ${{ steps.acct.outputs.args }}) > "$OUT" 2>&1
 
           # Capture the numeric ID field from JSON
-          EW_ID=$(echo "$RESPONSE" | jq -r '.edgeWorkerId // empty')
+          EW_ID=$(jq -r '(.data[0].edgeWorkerId // .edgeWorkerId) // empty' "$OUT")
 
           echo "EdgeWorker ID: $EW_ID"
           echo "ew_id=$EW_ID" >> $GITHUB_OUTPUT
