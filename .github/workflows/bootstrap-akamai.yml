@@ -17,9 +17,9 @@ jobs:
 
       - name: Install Akamai CLI and required packages
         run: |
-          curl -sL -o akamai https://github.com/akamai/cli/releases/download/v2.0.2/akamai-v2.0.2-linuxamd64
-          chmod +x akamai
-          sudo mv akamai /usr/local/bin/akamai
+          curl -sL -o $RUNNER_TEMP/akamai https://github.com/akamai/cli/releases/download/v2.0.2/akamai-v2.0.2-linuxamd64
+          chmod +x $RUNNER_TEMP/akamai
+          sudo mv $RUNNER_TEMP/akamai /usr/local/bin/akamai
           akamai install edgeworkers
           akamai install property-manager
 
