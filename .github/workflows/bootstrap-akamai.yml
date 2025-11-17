@@ -6,6 +6,10 @@ on:
 env:
   ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
   AKAMAI_GROUP_ID: ${{ vars.AKAMAI_GROUP_ID }}
+  AKAMAI_HOST: ${{ secrets.AKAMAI_HOST }}
+  AKAMAI_CLIENT_TOKEN: ${{ secrets.AKAMAI_CLIENT_TOKEN }}
+  AKAMAI_CLIENT_SECRET: ${{ secrets.AKAMAI_CLIENT_SECRET }}
+  AKAMAI_ACCESS_TOKEN: ${{ secrets.AKAMAI_ACCESS_TOKEN }}
 
 jobs:
   bootstrap:
@@ -27,7 +31,7 @@ jobs:
         run: |
           # Fail if any required secrets are missing/empty
           missing=()
-          for var in ${{ secrets.AKAMAI_HOST }} ${{ secrets.AKAMAI_CLIENT_TOKEN }} ${{ secrets.AKAMAI_CLIENT_SECRET }} ${{ secrets.AKAMAI_ACCESS_TOKEN }}; do
+          for var in AKAMAI_HOST AKAMAI_CLIENT_TOKEN AKAMAI_CLIENT_SECRET AKAMAI_ACCESS_TOKEN; do
             if [ -z "${!var:-}" ]; then
               echo "::error title=Missing secret::$var is not set."
               missing+=("$var")
@@ -39,10 +43,10 @@ jobs:
 
           cat > ~/.edgerc <<'EOF'
           [default]
-          host = ${{ secrets.AKAMAI_HOST }}
-          client_token = ${{ secrets.AKAMAI_CLIENT_TOKEN }}
-          client_secret = ${{ secrets.AKAMAI_CLIENT_SECRET }}
-          access_token = ${{ secrets.AKAMAI_ACCESS_TOKEN }}
+          host = AKAMAI_HOST
+          client_token = AKAMAI_CLIENT_TOKEN
+          client_secret = AKAMAI_CLIENT_SECRET
+          access_token = AKAMAI_ACCESS_TOKEN
           EOF
 
       - name: Load Akamai config
