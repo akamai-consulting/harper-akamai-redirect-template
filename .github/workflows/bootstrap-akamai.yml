@@ -27,7 +27,7 @@ jobs:
         run: |
           # Fail if any required secrets are missing/empty
           missing=()
-          for var in AKAMAI_HOST AKAMAI_CLIENT_TOKEN AKAMAI_CLIENT_SECRET AKAMAI_ACCESS_TOKEN; do
+          for var in ${{ secrets.AKAMAI_HOST }} ${{ secrets.AKAMAI_CLIENT_TOKEN }} ${{ secrets.AKAMAI_CLIENT_SECRET }} ${{ secrets.AKAMAI_ACCESS_TOKEN }}; do
             if [ -z "${!var:-}" ]; then
               echo "::error title=Missing secret::$var is not set."
               missing+=("$var")
