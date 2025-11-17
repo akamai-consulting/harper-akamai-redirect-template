@@ -85,15 +85,15 @@ jobs:
             echo "args=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create EdgeWorker (if no ID)
+      - name: Create EdgeWorker
         id: create_ew
         if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
 
-          RESPONSE=$(akamai edgeworkers create \
+          RESPONSE=$(akamai edgeworkers register \
             --resourceTierId "${{ steps.cfg.outputs.ew_tier }}" \
-            --groupId "${{ steps.cfg.outputs.groupId }}" \
-            --name "${{ steps.cfg.outputs.ew_name }}" \
+            "${{ steps.cfg.outputs.groupId }}" \
+            "${{ steps.cfg.outputs.ew_name }}" \
             --jsonout \
             ${{ steps.acct.outputs.args }})
 
