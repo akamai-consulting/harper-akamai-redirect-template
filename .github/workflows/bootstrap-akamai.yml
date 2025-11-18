@@ -86,7 +86,7 @@ jobs:
 
       - name: Create EdgeWorker
         id: create_ew
-        if: ${{ steps.cfg.outputs.ew_create == 'true' && steps.cfg.outputs.ew_id == '' }}
+        if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
           OUT="$RUNNER_TEMP/ew.json"; ERR="$RUNNER_TEMP/ew.err"
 
@@ -102,6 +102,11 @@ jobs:
 
           [ -n "$EW_ID" ] || { echo "::error::edgeWorkerId not found"; echo "stdout:"; cat "$OUT"; echo "stderr:"; cat "$ERR"; exit 1; }
           echo "ew_id=$EW_ID" >> "$GITHUB_OUTPUT"
+
+
+      - name: Inject HARPER_BASE_URL into EdgeWorker
+        run: |
+          sed -i "s|const HARPER_BASE_URL = 'https://YOUR-HARPER-HOST/checkredirect';|const HARPER_BASE_URL = '${{ steps.cfg.outputs.harper_base_url }}';|" akamai/edgeworker/main.js
 
 
       - name: Upload EW bundle
