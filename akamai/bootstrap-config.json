@@ -9,7 +9,7 @@
     "create": true,
     "name": "harper-redirector-ew",
     "resourceTierId": 200,
-    "harperRedirectBaseUrl": "https://harper.staging.example.com/checkredirect",
+    "harperRedirectBaseUrl": "https://harper.staging.example.com/checkredirect"
   },
 
   "akamai-property": {
