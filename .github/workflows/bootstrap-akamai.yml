@@ -132,6 +132,8 @@ jobs:
       - name: Create Property from template
         id: create_property
         if: ${{ steps.cfg.outputs.prop_create == 'true' }}
+        env:
+          AKAMAI_EDGERC_CONFIG_SECTION: default
         run: |
           set -euo pipefail
 
