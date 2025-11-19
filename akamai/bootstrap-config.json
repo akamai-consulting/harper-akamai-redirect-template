@@ -6,7 +6,7 @@
   },
 
   "akamai_edgeworker": {
-    "create": true,
+    "create": false,
     "name": "harper-redirector-ew",
     "resourceTierId": 200,
     "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net/checkredirect"
