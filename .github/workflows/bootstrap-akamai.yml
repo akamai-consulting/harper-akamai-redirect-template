@@ -128,6 +128,7 @@ jobs:
         
 
       - name: Activate EW on staging
+        if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
           akamai edgeworkers activate "${{ steps.create_ew.outputs.ew_id }}" \
             staging \
