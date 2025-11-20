@@ -280,7 +280,7 @@ jobs:
           PROPVER=$(akamai property-manager list-property-hostnames \
             -p "$PROP_ID" \
             --format json \
-            "${PM_ARGS[@]}" | jq -r '.propertyVersion')
+            "${PM_ARGS[@]}" | jq -r 'map(.propertyVersion) | max')
 
           if [ -z "${PROPVER:-}" ] || [ "${PROPVER}" = "null" ]; then
             echo "::error::Could not determine property version for '$PROP_ID' from list-property-hostnames output"
