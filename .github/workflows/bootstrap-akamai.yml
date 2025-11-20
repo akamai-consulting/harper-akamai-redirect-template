@@ -236,16 +236,19 @@ jobs:
           fi
 
           echo "Updating rules for property id '$PROP_ID' from $RULES_FILE"
-          akamai property-manager property-update \
+          PROP_VER=akamai property-manager property-update \
             -p "$PROP_ID" \
             --file "$RULES_FILE" \
             --message "Initialize/update from harper-redirect-template.v1.default.json" \
-            "${PM_ARGS[@]}"
+            "${PM_ARGS[@]}" | jq -r '.[0].propertyVersion // empty
+      
+          echo "prop_ver=$PROP_VER" >> "$GITHUB_OUTPUT"
 
       - name: Update property hostnames
         if: ${{ steps.cfg.outputs.prop_create == 'true' }}
         env:
           PROP_ID: ${{ steps.create_property.outputs.prop_id }}
+          PROP_VER: ${{ steps.create_property.outputs.prop_ver }}
           CONTRACT_ID: ${{ steps.cfg.outputs.contractId }}
           GROUP_ID: ${{ steps.cfg.outputs.groupId }}
           EDGE_HOSTNAME: ${{ steps.cfg.outputs.edge_hostname }}
@@ -276,20 +279,9 @@ jobs:
           jq -n --arg from "$CNAME_TARGET" --arg to "$EDGE_HOSTNAME" \
             '[{ cnameFrom: $from, cnameTo: $to, certProvisioningType: "DEFAULT", cnameType: "EDGE_HOSTNAME", edgeHostnameId: null }]' > "$HOSTNAMES_FILE"
 
-          echo "Determining latest property version for '$PROP_ID' via list-property-hostnames"
-          PROPVER=$(akamai property-manager list-property-hostnames \
-            -p "$PROP_ID" \
-            --format json \
-            "${PM_ARGS[@]}" | jq -r 'map(.propertyVersion) | max')
-
-          if [ -z "${PROPVER:-}" ] || [ "${PROPVER}" = "null" ]; then
-            echo "::error::Could not determine property version for '$PROP_ID' from list-property-hostnames output"
-            exit 1
-          fi
-
-          echo "Updating hostnames for property id '$PROP_ID' on version $PROPVER using hostname-update"
+          echo "Updating hostnames for property id '$PROP_ID' on version $PROP_VER using hostname-update"
           akamai property-manager hostname-update \
             -p "$PROP_ID" \
-            --propver "$PROPVER" \
+            --propver "$PROP_VER" \
             --file "$HOSTNAMES_FILE" \
             "${PM_ARGS[@]}"
