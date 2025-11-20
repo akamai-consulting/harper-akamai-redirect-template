@@ -222,9 +222,9 @@ jobs:
           fi
 
           if [ -n "${SEND_HOST_HEADER:-}" ]; then
-            echo "Setting forward host header to '$SEND_HOST_HEADER' in rules JSON"
+            echo "Setting forward host header to custom '$SEND_HOST_HEADER' in rules JSON"
             jq --arg send "$SEND_HOST_HEADER" \
-              '.rules.behaviors |= (map(if .name == "origin" then (.options.forwardHostHeader = $send) else . end))' \
+              '.rules.behaviors |= (map(if .name == "origin" then (.options.forwardHostHeader = "CUSTOM" | .options.customForwardHostHeader = $send) else . end))' \
               "$RULES_FILE" > "$RULES_FILE.tmp"
             mv "$RULES_FILE.tmp" "$RULES_FILE"
           fi
