@@ -161,7 +161,7 @@ jobs:
           echo "Checking if property '$PROP_NAME' already exists..."
 
           # Does the property already exist?
-          if akamai property-manager search "$PROP_NAME" | grep -q "$PROP_NAME"; then
+          if akamai property-manager search "$PROP_NAME" --accountSwitchKey ${{ vars.ACCOUNT_SWITCH_KEY }} | grep -q "$PROP_NAME"; then
             echo "Property '$PROP_NAME' already exists. Skipping creation."
           else
             echo "Property '$PROP_NAME' not found. Creating new property on contract $CONTRACT_ID, group $GROUP_ID, product $PRODUCT_ID"
@@ -170,7 +170,7 @@ jobs:
               -c "$CONTRACT_ID" \
               -g "$GROUP_ID" \
               -d "$PRODUCT_ID" \
-              "$PROP_NAME"
+              -p "$PROP_NAME"
               --secure
               --accountSwitchKey ${{ vars.ACCOUNT_SWITCH_KEY }}
 
@@ -178,7 +178,7 @@ jobs:
 
             # Wait/retry until PAPI can see the property (to avoid property_does_not_exist_on_server).
             for i in $(seq 1 10); do
-              if akamai property-manager search "$PROP_NAME" | grep -q "$PROP_NAME"; then
+              if akamai property-manager search "$PROP_NAME" --accountSwitchKey ${{ vars.ACCOUNT_SWITCH_KEY }} | grep -q "$PROP_NAME"; then
                 echo "Property '$PROP_NAME' is now visible (attempt $i)."
                 break
               fi
