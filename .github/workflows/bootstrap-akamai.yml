@@ -236,12 +236,14 @@ jobs:
           fi
 
           echo "Updating rules for property id '$PROP_ID' from $RULES_FILE"
-          PROP_VER=akamai property-manager property-update \
-            -p "$PROP_ID" \
-            --file "$RULES_FILE" \
-            --message "Initialize/update from harper-redirect-template.v1.default.json" \
-            "${PM_ARGS[@]}" | jq -r '.[0].propertyVersion // empty'
-      
+          PROP_VER=$(
+              akamai property-manager property-update \
+                  -p "$PROP_ID" \
+                  --file "$RULES_FILE" \
+                  --message "Initialize/update from harper-redirect-template.v1.default.json" \
+                  "${PM_ARGS[@]}" \
+              | jq -r '.[0].propertyVersion // empty'
+          )
           echo "prop_ver=$PROP_VER" >> "$GITHUB_OUTPUT"
 
       - name: Update property hostnames
