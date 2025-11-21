@@ -10,9 +10,9 @@ On each request, an EdgeWorker calls Harper; if Harper returns a redirect URL, t
 
 > Replace these image paths with real diagrams as needed.
 
-![High-level redirect flow](docs/images/architecture-high-level.png)
+![High-level redirect flow](https://placehold.co/800x260?text=High-level+redirect+flow)
 
-![EdgeWorker ↔ Harper detail](docs/images/architecture-edgeworker-detail.png)
+![EdgeWorker ↔ Harper detail](https://placehold.co/800x260?text=EdgeWorker+%E2%86%94+Harper+detail)
 
 ---
 
