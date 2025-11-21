@@ -54,6 +54,11 @@ jobs:
           access_token = $AKAMAI_ACCESS_TOKEN
           EOF
 
+      - name: Install HTTPie EdgeGrid helper
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpie httpie-edgegrid
+
       - name: Load Akamai config
         id: cfg
         run: |
@@ -138,36 +143,69 @@ jobs:
             ${{ steps.acct.outputs.args }}
       
       
-      - name: Validate edge hostname exists
+      - name: Create edge hostname via PAPI if needed
         if: ${{ steps.cfg.outputs.prop_create == 'true' }}
         env:
           CONTRACT_ID: ${{ steps.cfg.outputs.contractId }}
           GROUP_ID: ${{ steps.cfg.outputs.groupId }}
+          PRODUCT_ID: ${{ steps.cfg.outputs.productId }}
           EDGE_HOSTNAME: ${{ steps.cfg.outputs.edge_hostname }}
           ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
         run: |
           set -euo pipefail
 
           if [ -z "${EDGE_HOSTNAME:-}" ]; then
-            echo "edgeHostname empty; skipping edge hostname check."
+            echo "edgeHostname empty; skipping edge hostname creation."
             exit 0
           fi
 
-          PM_ARGS=()
-          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
-            PM_ARGS+=(--accountSwitchKey "$ACCOUNT_SWITCH_KEY")
+          PREFIX="${EDGE_HOSTNAME%%.*}"
+          SUFFIX="${EDGE_HOSTNAME#*.}"
+
+          if [ "$SUFFIX" != "akamaized.net" ]; then
+            echo "::error::This step only supports akamaized.net hostnames; got '$SUFFIX'."
+            exit 1
           fi
 
-          echo "Checking if edge hostname '$EDGE_HOSTNAME' exists via list-edgehostnames..."
-          if ! akamai property-manager list-edgehostnames \
-                -c "$CONTRACT_ID" \
-                -g "$GROUP_ID" \
-                --format json "${PM_ARGS[@]}" \
-                | jq -e --arg eh "$EDGE_HOSTNAME" '.[] | select(.edgeHostname == $eh)' >/dev/null 2>&1; then
-            echo "::warning::Edge hostname '$EDGE_HOSTNAME' not found. You must create it manually (shared cert or enhanced TLS as desired) before hostname-update can succeed."
+          echo "Edge hostname prefix=$PREFIX, suffix=$SUFFIX, productId=$PRODUCT_ID"
+
+          BODY=$(jq -n \
+            --arg product "$PRODUCT_ID" \
+            --arg prefix "$PREFIX" \
+            --arg suffix "$SUFFIX" \
+            '{
+              productId: $product,
+              domainPrefix: $prefix,
+              domainSuffix: $suffix,
+              ipVersionBehavior: "IPV4",
+              secureNetwork: "SHARED_CERT"
+            }')
+
+          echo "Creating edge hostname '$EDGE_HOSTNAME' via PAPI (SHARED_CERT)"
+          set +e
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            printf '%s\n' "$BODY" | http --auth-type=edgegrid -a papi: \
+              POST :/papi/v1/edgehostnames \
+              contractId=="$CONTRACT_ID" \
+              groupId=="$GROUP_ID" \
+              accountSwitchKey=="$ACCOUNT_SWITCH_KEY" \
+              PAPI-Use-Prefixes:false \
+              Content-Type:application/json
           else
-            echo "Edge hostname '$EDGE_HOSTNAME' exists."
+            printf '%s\n' "$BODY" | http --auth-type=edgegrid -a papi: \
+              POST :/papi/v1/edgehostnames \
+              contractId=="$CONTRACT_ID" \
+              groupId=="$GROUP_ID" \
+              PAPI-Use-Prefixes:false \
+              Content-Type:application/json
           fi
+          RC=$?
+          set -e
+
+          if [ "$RC" -ne 0 ]; then
+            echo "::warning::Edge hostname create may have failed (possibly already exists). Check Control Center if hostname-update later fails."
+          fi
+
 
       - name: Create/Update Property from template
         id: create_property
@@ -280,6 +318,7 @@ jobs:
           )
           echo "prop_ver=$PROP_VER" >> "$GITHUB_OUTPUT"
 
+      
       - name: Update property hostnames
         if: ${{ steps.cfg.outputs.prop_create == 'true' }}
         env:
