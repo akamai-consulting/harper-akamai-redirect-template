@@ -361,3 +361,30 @@ jobs:
             --propver "$PROP_VER" \
             --file "$HOSTNAMES_FILE" \
             "${PM_ARGS[@]}"
+          
+          
+      - name: Activate property on staging
+        if: ${{ steps.cfg.outputs.prop_create == 'true' }}
+        env:
+          PROP_ID: ${{ steps.create_property.outputs.prop_id }}
+          PROP_VER: ${{ steps.create_property.outputs.prop_ver }}
+          ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PROP_ID:-}" ] || [ -z "${PROP_VER:-}" ]; then
+            echo "::error::prop_id or prop_ver missing; cannot activate property"
+            exit 1
+          fi
+
+          PM_ARGS=()
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            PM_ARGS+=(--accountSwitchKey "$ACCOUNT_SWITCH_KEY")
+          fi
+
+          echo "Activating property '$PROP_ID' version '$PROP_VER' on STAGING"
+          akamai property-manager activate-version \
+            -p "$PROP_ID" \
+            --propver "$PROP_VER" \
+            --network STAGING \
+            "${PM_ARGS[@]}"
