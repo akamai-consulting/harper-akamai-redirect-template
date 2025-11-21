@@ -138,29 +138,19 @@ jobs:
             ${{ steps.acct.outputs.args }}
       
       
-      - name: Create shared-cert edge hostname if needed
+      - name: Validate edge hostname exists
         if: ${{ steps.cfg.outputs.prop_create == 'true' }}
         env:
-          PRODUCT_ID: ${{ steps.cfg.outputs.productId }}
           CONTRACT_ID: ${{ steps.cfg.outputs.contractId }}
           GROUP_ID: ${{ steps.cfg.outputs.groupId }}
           EDGE_HOSTNAME: ${{ steps.cfg.outputs.edge_hostname }}
-          NETWORK: ${{ steps.cfg.outputs.network }}
           ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
         run: |
           set -euo pipefail
 
           if [ -z "${EDGE_HOSTNAME:-}" ]; then
-            echo "edgeHostname empty; skipping edge hostname creation."
+            echo "edgeHostname empty; skipping edge hostname check."
             exit 0
-          fi
-
-          DOMAIN_PREFIX="${EDGE_HOSTNAME%%.*}"
-          DOMAIN_SUFFIX="${EDGE_HOSTNAME#*.}"
-
-          if [ "$DOMAIN_SUFFIX" != "akamaized.net" ]; then
-            echo "::error::This step currently only supports akamaized.net hostnames. Got suffix '$DOMAIN_SUFFIX'."
-            exit 1
           fi
 
           PM_ARGS=()
@@ -168,72 +158,16 @@ jobs:
             PM_ARGS+=(--accountSwitchKey "$ACCOUNT_SWITCH_KEY")
           fi
 
-          # Idempotent: skip if edge hostname already exists
-          if akamai property-manager list-edgehostnames --format json "${PM_ARGS[@]}" \
-              | jq -e --arg eh "$EDGE_HOSTNAME" '.[] | select(.edgeHostname == $eh)' >/dev/null 2>&1; then
-            echo "Edge hostname '$EDGE_HOSTNAME' already exists; skipping edgehostname-create."
-            exit 0
-          fi
-
-          # Decide secure flags based on NETWORK
-          SECURE=false
-          SECURE_NETWORK=""
-          if [ "${NETWORK:-}" = "enhancedTLS" ]; then
-            SECURE=true
-            SECURE_NETWORK="ENHANCED_TLS"
-          fi
-
-          EH_FILE="$RUNNER_TEMP/edgehostname.json"
-          echo "Creating edge hostname JSON at $EH_FILE (secure=$SECURE, network=$NETWORK)"
-
-          if [ "$SECURE" = true ]; then
-            jq -n \
-              --arg product "$PRODUCT_ID" \
-              --arg prefix "$DOMAIN_PREFIX" \
-              --arg suffix "$DOMAIN_SUFFIX" \
-              --arg secureNetwork "$SECURE_NETWORK" \
-              '{
-                productId: $product,
-                domainPrefix: $prefix,
-                ipVersionBehavior: "IPV4",
-                domainSuffix: $suffix,
-                secure: true,
-                secureNetwork: $secureNetwork,
-                useCases: [
-                  {
-                    useCase: "Web_Delivery",
-                    option: "DEFAULT",
-                    type: "GLOBAL"
-                  }
-                ]
-              }' > "$EH_FILE"
+          echo "Checking if edge hostname '$EDGE_HOSTNAME' exists via list-edgehostnames..."
+          if ! akamai property-manager list-edgehostnames \
+                -c "$CONTRACT_ID" \
+                -g "$GROUP_ID" \
+                --format json "${PM_ARGS[@]}" \
+                | jq -e --arg eh "$EDGE_HOSTNAME" '.[] | select(.edgeHostname == $eh)' >/dev/null 2>&1; then
+            echo "::warning::Edge hostname '$EDGE_HOSTNAME' not found. You must create it manually (shared cert or enhanced TLS as desired) before hostname-update can succeed."
           else
-            jq -n \
-              --arg product "$PRODUCT_ID" \
-              --arg prefix "$DOMAIN_PREFIX" \
-              --arg suffix "$DOMAIN_SUFFIX" \
-              '{
-                productId: $product,
-                domainPrefix: $prefix,
-                ipVersionBehavior: "IPV4",
-                domainSuffix: $suffix,
-                secure: false,
-                useCases: [
-                  {
-                    useCase: "Web_Delivery",
-                    option: "DEFAULT",
-                    type: "GLOBAL"
-                  }
-                ]
-              }' > "$EH_FILE"
+            echo "Edge hostname '$EDGE_HOSTNAME' exists."
           fi
-
-          echo "Creating edge hostname '$EDGE_HOSTNAME' for product $PRODUCT_ID (secure=$SECURE)"
-          akamai property-manager edgehostname-create \
-            --file "$EH_FILE" \
-            -c "$CONTRACT_ID" \
-            -g "$GROUP_ID" \
-            "${PM_ARGS[@]}"
 
       - name: Create/Update Property from template
         id: create_property
@@ -261,11 +195,8 @@ jobs:
             exit 1
           fi
 
-          # Build PM CLI account switch args
+          # Build PM CLI account switch args (shared for search/property-update/etc.)
           PM_ARGS=()
-          if [ "${NETWORK:-}" = "enhancedTLS" ]; then
-            PM_ARGS+=(--secure)
-          fi
           if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
             PM_ARGS+=(--accountSwitchKey "$ACCOUNT_SWITCH_KEY")
           fi
@@ -282,11 +213,17 @@ jobs:
           if [ -z "$PROP_ID" ]; then
             echo "Property '$PROP_NAME' not found. Creating new property on contract $CONTRACT_ID, group $GROUP_ID, product $PRODUCT_ID"
 
+            NEW_PROP_ARGS=()
+            if [ "${NETWORK:-}" = "enhancedTLS" ]; then
+              NEW_PROP_ARGS+=(--secure)
+            fi
+
             akamai property-manager new-property \
               -c "$CONTRACT_ID" \
               -g "$GROUP_ID" \
               -d "$PRODUCT_ID" \
               -p "$PROP_NAME" \
+              "${NEW_PROP_ARGS[@]}" \
               "${PM_ARGS[@]}"
 
             echo "Property creation requested. Waiting for it to be visible in PAPI..."
