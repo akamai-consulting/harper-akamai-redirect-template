@@ -117,28 +117,28 @@ jobs:
             exit 1
           fi
 
-          echo "Deploying Harper redirector app from '${HARPER_REDIRECTOR_REPO}' to ${HARPER_DEPLOY_URL} using template's npm scripts"
+          echo "Deploying Harper redirector app from '${HARPER_REDIRECTOR_REPO}' to ${HARPER_DEPLOY_URL} using harperdb deploy_component"
 
-          # Install Harper CLI (if the app's scripts need it)
+          # Install Harper CLI
           npm install -g harperdb
 
+          # Clone the redirector template so we package exactly what you would run locally.
           APP_DIR="$RUNNER_TEMP/harper-redirector-app"
           rm -rf "$APP_DIR"
           git clone "$HARPER_REDIRECTOR_REPO" "$APP_DIR"
           cd "$APP_DIR"
 
-          # Install app dependencies
-          npm install
+          # Use Harper CLI to deploy this local project directory to the remote Fabric cluster.
+          # We prefer CLI_TARGET_* env vars so credentials aren't echoed in logs.
+          export CLI_TARGET_USERNAME="${HARBOR_USER}"
+          export CLI_TARGET_PASSWORD="${HARBOR_PASSWORD}"
 
-          # Configure .env for non-interactive deploy; adjust keys if the template expects different names.
-          cat > .env <<EOF
-          HARPERDB_USERNAME=${HARBOR_USER}
-          HARPERDB_PASSWORD=${HARBOR_PASSWORD}
-          HARPERDB_URL=${HARPER_DEPLOY_URL}
-          EOF
-
-          # Deploy using the app's deploy script
-          npm run deploy
+          harperdb deploy_component \
+            project=akamai-redirector \
+            package="$(pwd)" \
+            target="${HARPER_DEPLOY_URL}" \
+            restart=true \
+            replicated=true
             replicated=true
 
       - name: Create EdgeWorker
