@@ -207,18 +207,6 @@ jobs:
               secureNetwork: "SHARED_CERT"
             }')
           fi
-          
-          BODY=$(jq -n \
-            --arg product "$PRODUCT_ID" \
-            --arg prefix "$PREFIX" \
-            --arg suffix "$SUFFIX" \
-            '{
-              productId: $product,
-              domainPrefix: $prefix,
-              domainSuffix: $suffix,
-              ipVersionBehavior: "IPV4",
-              secureNetwork: "SHARED_CERT"
-            }')
 
           echo "Creating edge hostname '$EDGE_HOSTNAME' via PAPI (SHARED_CERT)"
           set +e
