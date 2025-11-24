@@ -142,10 +142,17 @@ jobs:
       - name: Activate EW on staging
         if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
+          
+          # Build PM CLI account switch args
+          PM_ARGS=()
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            PM_ARGS+=(--accountkey "$ACCOUNT_SWITCH_KEY")
+          fi
+          
           akamai edgeworkers activate "${{ steps.create_ew.outputs.ew_id }}" \
             staging \
             0.1 \
-            ${{ steps.acct.outputs.args }}
+            "${PM_ARGS[@]}"
       
       
       - name: Create edge hostname via PAPI
