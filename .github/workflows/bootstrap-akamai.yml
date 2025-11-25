@@ -91,6 +91,7 @@ jobs:
           echo "harper_deploy=$(get '.harper_app.deploy')" >> $GITHUB_OUTPUT
           echo "harper_deploy_url=$(get '.harper_app.deployUrl')" >> $GITHUB_OUTPUT
           echo "harper_redirector_repo=$(get '.harper_app.redirectorRepoUrl')" >> $GITHUB_OUTPUT
+          echo "harper_project=$(get '.harper_app.projectName')" >> $GITHUB_OUTPUT
 
       - name: Deploy Harper redirector app
         if: ${{ steps.cfg.outputs.harper_deploy == 'true' }}
@@ -99,6 +100,7 @@ jobs:
           HARBOR_PASSWORD: ${{ env.HARBOR_PASSWORD }}
           HARPER_DEPLOY_URL: ${{ steps.cfg.outputs.harper_deploy_url }}
           HARPER_REDIRECTOR_REPO: ${{ steps.cfg.outputs.harper_redirector_repo }}
+          HARPER_PROJECT: ${{ steps.cfg.outputs.harper_project }}
         run: |
           set -euo pipefail
 
@@ -117,28 +119,20 @@ jobs:
             exit 1
           fi
 
-          echo "Deploying Harper redirector app from '${HARPER_REDIRECTOR_REPO}' to ${HARPER_DEPLOY_URL} using harperdb deploy_component"
+          if [ -z "${HARPER_PROJECT:-}" ]; then
+            echo "::error title=Missing Harper project::harper_app.projectName is empty in akamai/bootstrap-config.json"
+            exit 1
+          fi
 
-          # Install Harper CLI
-          npm install -g harperdb
+          echo "Deploying Harper redirector app '${HARPER_PROJECT}' from template '${HARPER_REDIRECTOR_REPO}' via Harper Fabric Operations API"
 
-          # Clone the redirector template so we package exactly what you would run locally.
-          APP_DIR="$RUNNER_TEMP/harper-redirector-app"
-          rm -rf "$APP_DIR"
-          git clone "$HARPER_REDIRECTOR_REPO" "$APP_DIR"
-          cd "$APP_DIR"
-
-          # Use Harper CLI to deploy this local project directory to the remote Fabric cluster.
-          # We prefer CLI_TARGET_* env vars so credentials aren't echoed in logs.
-          export CLI_TARGET_USERNAME="${HARBOR_USER}"
-          export CLI_TARGET_PASSWORD="${HARBOR_PASSWORD}"
-
-          harperdb deploy_component \
-            project=akamai-redirector \
-            package="$(pwd)" \
-            target="${HARPER_DEPLOY_URL}" \
-            restart=true \
-            replicated=true
+          # Use Harper Fabric Operations API 'add_component' to create/update the component
+          http --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
+            POST "${HARPER_DEPLOY_URL}" \
+            operation=add_component \
+            project="${HARPER_PROJECT}" \
+            template="${HARPER_REDIRECTOR_REPO}" \
+            replicated:=true
             replicated=true
 
       - name: Create EdgeWorker
