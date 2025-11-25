@@ -127,7 +127,7 @@ jobs:
           echo "Deploying Harper redirector app '${HARPER_PROJECT}' from template '${HARPER_REDIRECTOR_REPO}' via Harper Fabric Operations API"
 
           # Use Harper Fabric Operations API 'add_component' to create/update the component
-          http --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
+          http --ignore-stdin --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
             POST "${HARPER_DEPLOY_URL}" \
             operation=add_component \
             project="${HARPER_PROJECT}" \
