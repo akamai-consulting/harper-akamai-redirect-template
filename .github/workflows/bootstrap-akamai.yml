@@ -152,13 +152,14 @@ jobs:
           echo "Waiting for Harper redirector metrics endpoint at ${HEALTH_URL} to return 200 (OPTIONS)"
 
           for i in $(seq 1 30); do
-            STATUS=$(http --ignore-stdin --print=Hh OPTIONS "${HEALTH_URL}" 2>/dev/null | head -n1 | awk '{print $2}' || true)
+            # Use only response headers (-p h) so the first line is 'HTTP/1.1 <code> ...'
+            STATUS=$(http --ignore-stdin --print=h OPTIONS "${HEALTH_URL}" 2>/dev/null | head -n1 | awk '{print $2}' || true)
             if [ "${STATUS}" = "200" ]; then
               echo "Redirector app is healthy (redirectmetrics OPTIONS returned 200)."
               exit 0
             fi
-            echo "Attempt ${i}: redirectmetrics OPTIONS status='${STATUS:-none}', retrying in 10s..."\n            sleep 10
-          done
+            echo "Attempt ${i}: redirectmetrics OPTIONS status='${STATUS:-none}', retrying in 10s..."
+            sleep 10
           done
 
           echo "::error title=Redirector app not healthy::redirectmetrics did not return 200 after 30 attempts"
