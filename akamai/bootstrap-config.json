@@ -5,14 +5,14 @@
   },
 
   "akamai_edgeworker": {
-    "create": false,
+    "create": true,
     "name": "harper-redirector-ew",
     "resourceTierId": 200,
     "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net/checkredirect"
   },
 
   "akamai_property": {
-    "create": false,
+    "create": true,
     "productId": "prd_Fresca",
     "network": "enhancedTLS",
     "name": "harper-redirect-ew-subrequests",
