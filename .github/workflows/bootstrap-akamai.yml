@@ -154,8 +154,8 @@ jobs:
           for i in $(seq 1 30); do
             # Use only response headers (-p h) so the first line is 'HTTP/1.1 <code> ...'
             STATUS=$(http --ignore-stdin --print=h OPTIONS "${HEALTH_URL}" 2>/dev/null | head -n1 | awk '{print $2}' || true)
-            if [ "${STATUS}" = "200" ]; then
-              echo "Redirector app is healthy (redirectmetrics OPTIONS returned 200)."
+            if [ "${STATUS}" = "200" ] || [ "${STATUS}" = "204" ]; then
+              echo "Redirector app is healthy (redirectmetrics OPTIONS returned ${STATUS})."
               exit 0
             fi
             echo "Attempt ${i}: redirectmetrics OPTIONS status='${STATUS:-none}', retrying in 10s..."
