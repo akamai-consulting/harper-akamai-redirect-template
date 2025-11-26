@@ -187,13 +187,13 @@ jobs:
           ROLE_NAME="redirects_reader"
           echo "Ensuring Harper role '${ROLE_NAME}' exists with read access on redirects database"
 
-          # Grant read access on the 'redirects' database tables used by the redirector component.
+          # Grant read-only access on the 'redirects' database tables used by the redirector component.
           # If the role already exists, this may return a non-2xx; treat that as a warning, not a hard failure.
           if ! http --ignore-stdin --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
             POST "${HARPER_DEPLOY_URL}:9925/" \
             operation=add_role \
             role="${ROLE_NAME}" \
-            permission:='{"super_user":false,"structure_user":false,"redirects":{"tables":{"rule":{"read":true},"hosts":{"read":true}}}}'; then
+            permission:='{"super_user":false,"structure_user":false,"redirects":{"tables":{"rule":{"insert":false,"update":false,"delete":false,"read":true,"attribute_permissions":[]},"hosts":{"insert":false,"update":false,"delete":false,"read":true,"attribute_permissions":[]}}}}'; then
             echo "::warning::add_role for '${ROLE_NAME}' may have failed (role may already exist)."
           fi
 
