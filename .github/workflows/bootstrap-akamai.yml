@@ -78,12 +78,13 @@ jobs:
           echo "ew_tier=$(get '.akamai_edgeworker.resourceTierId')" >> $GITHUB_OUTPUT
           echo "harper_base_url=$(get '.akamai_edgeworker.harperRedirectBaseUrl')" >> $GITHUB_OUTPUT
 
-          echo "prop_create=$(get '.akamai_property.create')" >> $GITHUB_OUTPUT
+          echo "prop_create=$(get '.akamai_property.createProperty')" >> $GITHUB_OUTPUT
+          echo "hostname_create=$(get '.akamai_property.createHostname')" >> $GITHUB_OUTPUT
           echo "productId=$(get '.akamai_property.productId')" >> $GITHUB_OUTPUT
           echo "network=$(get '.akamai_property.network')" >> $GITHUB_OUTPUT
           echo "prop_name=$(get '.akamai_property.name')" >> $GITHUB_OUTPUT
           echo "edge_hostname=$(get '.akamai_property.edgeHostname')" >> $GITHUB_OUTPUT
-          echo "cname_target=$(get '.akamai_property.cnameTarget')" >> $GITHUB_OUTPUT
+          echo "cname_target=$(get '.akamai_property.edgeHostname')" >> $GITHUB_OUTPUT
           echo "origin_host=$(get '.akamai_property.originHostname')" >> $GITHUB_OUTPUT
           echo "harper_host=$(get '.akamai_property.sendHostHeader')" >> $GITHUB_OUTPUT
 
@@ -304,7 +305,7 @@ jobs:
       
       
       - name: Create edge hostname via PAPI
-        if: ${{ steps.cfg.outputs.prop_create == 'true' }}
+        if: ${{ steps.cfg.outputs.hostname_create == 'true' }}
         env:
           CONTRACT_ID: ${{ steps.cfg.outputs.contractId }}
           GROUP_ID: ${{ steps.cfg.outputs.groupId }}
@@ -494,7 +495,7 @@ jobs:
 
       
       - name: Update property hostnames
-        if: ${{ steps.cfg.outputs.prop_create == 'true' }}
+        if: ${{ steps.cfg.outputs.hostname_create == 'true' }}
         env:
           PROP_ID: ${{ steps.create_property.outputs.prop_id }}
           PROP_VER: ${{ steps.create_property.outputs.prop_ver }}
@@ -537,7 +538,7 @@ jobs:
           
           
       - name: Activate property on staging
-        if: ${{ steps.cfg.outputs.prop_create == 'true' }}
+        if: ${{ steps.cfg.outputs.prop_create == 'true' && steps.cfg.outputs.hostname_create == 'true'}}
         env:
           PROP_ID: ${{ steps.create_property.outputs.prop_id }}
           PROP_VER: ${{ steps.create_property.outputs.prop_ver }}

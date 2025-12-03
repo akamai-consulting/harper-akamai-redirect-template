@@ -57,8 +57,8 @@ sequenceDiagram
 
 ## Repository Structure
 
-* **.github/workflows/bootstrap.yml**: The main bootstrap automation pipeline.
-* **bootstrap-config.json**: The primary configuration file used to name and size resources.
+* **.github/workflows/bootstrap.yml**: The main bootstrap automation workflow. Executed manually.
+* **bootstrap-config.json**: The primary configuration file used to control bootstrap process.
 * **akamai/edgeworker/**: Contains the EdgeWorker source code (`main.js`) and bundle config.
 * **akamai/property/**: Contains the Property Manager JSON rule template for a property to front-end requests to Harper.
 * **redirects/redirects.json**: Redirect rules to implement in Harper.
@@ -80,7 +80,8 @@ The deployment is controlled by `bootstrap-config.json`. You must customize this
     "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net/checkredirect"
   },
   "akamai_property": {
-    "create": true,
+    "createProperty": true,
+    "createHostname": true,
     "name": "marketing-redirects",
     "productId": "prd_Fresca",
     "network": "enhancedTLS",
@@ -105,8 +106,7 @@ The deployment is controlled by `bootstrap-config.json`. You must customize this
 * **akamai_edgeworker**:
     * **harperRedirectBaseUrl**: The endpoint the EdgeWorker will call. This must be a hostname on Akamai. This is injected into the JavaScript source during the bootstrap process.
 * **akamai_property**:
-    * **edgeHostname**: The target Akamai hostname (must end in `.akamaized.net`).
-    * **cnameTarget**: The public hostname (CNAME) you will configure in DNS.
+    * **edgeHostname**: The target Akamai hostname (must end in `.akamaized.net`). If using a custom hostname, set createHostname to false. After bootstrap completion you can edit the property in property manager to add your hostname and deploy to staging.
 * **harper_app**:
     * **deployUrl**: Your HarperDB instance URL (do not include port).
     * **redirectorRepoUrl**: The package URL for the Harper component to deploy. Should be left as default.
