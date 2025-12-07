@@ -8,7 +8,7 @@
     "create": true,
     "name": "harper-redirector-ew",
     "resourceTierId": 200,
-    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net/checkredirect"
+    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net"
   },
 
   "akamai_property": {

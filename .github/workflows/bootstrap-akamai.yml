@@ -185,7 +185,7 @@ jobs:
             exit 1
           fi
 
-          ROLE_NAME="redirects_reader"
+          ROLE_NAME="read_only_user"
           echo "Ensuring Harper role '${ROLE_NAME}' exists with read access on redirects database"
 
           # Grant read-only access on the 'redirects' database tables used by the redirector component.
@@ -221,12 +221,12 @@ jobs:
           HARPER_EDGE_USERNAME="edge_redirect_$(date +%s)"
           HARPER_EDGE_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
 
-          echo "Creating Harper user '${HARPER_EDGE_USERNAME}' with role 'redirects_reader' for EdgeWorker access"
+          echo "Creating Harper user '${HARPER_EDGE_USERNAME}' with role 'read_only_user' for EdgeWorker access"
 
           http --ignore-stdin --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
             POST "${HARPER_DEPLOY_URL}:9925/" \
             operation=add_user \
-            role="redirects_reader" \
+            role="read_only_user" \
             username="${HARPER_EDGE_USERNAME}" \
             password="${HARPER_EDGE_PASSWORD}" \
             active:=true
@@ -258,9 +258,6 @@ jobs:
             --jsonout \
             "${PM_ARGS[@]}" 1>"$OUT" 2>"$ERR"
           set -e
-
-          cat "$RUNNER_TEMP/ew.err"
-          cat "$RUNNER_TEMP/ew.json"
 
           # strip everything before the first '{' then parse
           EW_ID=$(sed -e '1s/^[^{]*//' "$OUT" | jq -r '.data[0].edgeWorkerId')

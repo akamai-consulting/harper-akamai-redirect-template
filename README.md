@@ -49,7 +49,6 @@ sequenceDiagram
 
 ## Features
 
-* **Dynamic Decisioning:** Checks HarperDB for redirect rules in real-time.
 * **Infrastructure as Code:** 
   * Includes a GitHub Action ("Bootstrap Akamai Redirect Stack") that provisions the entire stack (EdgeWorker, Akamai Property, Edge Hostname, Harper Redirect Application, Harper Database role/user).
   * Supports uploading a `redirects.json` file to populate rules immediately upon deployment. Subsequent commits of redirects.json will be uploaded to Harper using GitHub Actions, allowing for effective management
@@ -77,12 +76,12 @@ The deployment is controlled by `bootstrap-config.json`. You must customize this
     "create": true,
     "name": "harper-redirect-worker",
     "resourceTierId": "200",
-    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net/checkredirect"
+    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net"
   },
   "akamai_property": {
     "createProperty": true,
     "createHostname": true,
-    "name": "marketing-redirects",
+    "name": "harper-redirects",
     "productId": "prd_Fresca",
     "network": "enhancedTLS",
     "edgeHostname": "hdb-redirects-customername.akamaized.net",
@@ -139,7 +138,7 @@ The workflow is a manual dispatch process. When triggered, it performs the follo
 1.  **Harper Deployment**:
     * Deploys the specified redirector application to your Harper instance.
     * Waits for the application to report a healthy status.
-    * Ensures a `redirects_reader` role exists.
+    * Ensures a `read_only_user` role exists.
     * **Security Step**: Generates a random username and password, creates this user in HarperDB, and base64 encodes the credentials.
 2.  **EdgeWorker Build**:
     * Injects the base64 Harper credential token into `main.js`.
