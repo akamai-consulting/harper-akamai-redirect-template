@@ -92,7 +92,7 @@ sequenceDiagram
    * Create cluster in Fabric: [Documentation](https://docs.harperdb.io/docs/getting-started/installation#manage-and-deploy-with-fabric)
    * Grab cluster URL and superuser credentials
 
-## 2. Clone Repository
+## 2. Clone or Fork Repository
 
 ```bash
   git clone https://github.com/akamai-consulting/harper-akamai-redirect-template
