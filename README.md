@@ -83,7 +83,6 @@ The deployment is controlled by `bootstrap-config.json`. You must customize this
     "productId": "prd_Fresca",
     "network": "enhancedTLS",
     "edgeHostname": "hdb-redirects-customername.akamaized.net",
-    "cnameTarget": "hdb-redirects-customername.akamaized.net",
     "originHostname": "harper-redirects.clustername.harperfabric.com",
     "sendHostHeader": "harper-redirects.clustername.harperfabric.com"
   },
