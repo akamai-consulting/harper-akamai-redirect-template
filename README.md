@@ -4,7 +4,7 @@ This repository serves as a template for deploying a high-performance redirect s
 
 Instead of hardcoding redirects in Akamai Property Manager or managing EdgeKV stores, this solution delegates the decision-making logic to a HarperDB API. The EdgeWorker intercepts requests, queries HarperDB, and either issues an immediate redirect or allows the request to proceed to the origin configured on the CDN layer.
 
-## Architecture
+## Request Flow
 
 ```mermaid
 sequenceDiagram
@@ -54,62 +54,55 @@ sequenceDiagram
 
 ## Repository Structure
 
-* **.github/workflows/bootstrap.yml**: The main bootstrap automation workflow. Executed manually.
-* **bootstrap-config.json**: The primary configuration file used to control bootstrap process.
-* **akamai/edgeworker/**: Contains the EdgeWorker source code (`main.js`) and bundle config.
-* **akamai/property/**: Contains the Property Manager JSON rule template for a property to front-end requests to Harper.
-* **redirects/redirects.json**: Redirect rules to implement in Harper.
+.
+├── README.md
+├── .github
+│   └── workflows
+│       └── bootstrap-akamai.yml                      # GitHub Action Workflow for bootstrapping Akamai Redirect Stack  
+├── akamai
+│   ├── edgeworker
+│   │   ├── bundle.json                               # Akamai EdgeWorker bundle configuration
+│   │   └── main.js                                   # Akamai EdgeWorker source code
+│   └── property
+│       └── harper-redirect-template.v1.default.json  # Akamai Property Manager JSON rule template
+├── bootstrap-config.json                             # Bootstrap configuration file
+└── harper-redirects
+    └── redirects.json                                # Redirect rules to implement in Harper
 
-## Configuration
+## Prerequisites
 
-The deployment is controlled by `bootstrap-config.json`. You must customize this file before running the workflow.
+* Akamai API credentials with the following permissions:
+  * EdgeWorkers READ-WRITE
+  * Property Manager (PAPI) READ-WRITE
+* Akamai Account Details
+  * Contract ID
+  * Group ID
+* Harper Fabric Account
+  * Harper Cluster
+  * Harper Superuser Credentials
+  * Harper URL
 
-```json
-{
-  "akamai_account": {
-    "contractId": "ctr_1-ABC",
-    "groupId": "grp_12345"
-  },
-  "akamai_edgeworker": {
-    "create": true,
-    "name": "harper-redirect-worker",
-    "resourceTierId": "200",
-    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net"
-  },
-  "akamai_property": {
-    "createProperty": true,
-    "createHostname": true,
-    "name": "harper-redirects",
-    "productId": "prd_Fresca",
-    "network": "enhancedTLS",
-    "edgeHostname": "hdb-redirects-customername.akamaized.net",
-    "originHostname": "harper-redirects.clustername.harperfabric.com",
-    "sendHostHeader": "harper-redirects.clustername.harperfabric.com"
-  },
-  "harper_app": {
-    "deploy": true,
-    "uploadRedirectJSON": true,
-    "deployUrl": "https://harper-redirects.clustername.harperfabric.com",
-    "redirectorRepoUrl": "https://github.com/HarperFast/template-redirector",
-    "projectName": "harper-redirector"
-  }
-}
+## 1. Gather Prerequisites
+1. Create Akamai API Credentials: [Documentation](https://techdocs.akamai.com/onboard/docs/set-up-identity-and-access-api#4-set-up-authentication-credentials)
+2. Gather Akamai Account Details:
+   * Contract ID: Hamburger Menu > Account Admin > Contracts
+   * Group ID: 
+3. Create Harper Cluster
+   * If needed create Harper Fabric account: [Documentation](https://fabric.harper.fast/#/sign-up)
+   * Create cluster in Fabric: [Documentation](https://docs.harperdb.io/docs/getting-started/installation#manage-and-deploy-with-fabric)
+   * Grab cluster URL and superuser credentials
+
+## 2. Clone Repository
+
+```bash
+  git clone https://github.com/akamai-consulting/harper-akamai-redirect-template
+  cd harper-akamai-redirect-template
+  git remote add origin <your-github-repo-url>
 ```
 
-### Configuration Details
+## 3. Configure Repository Secrets
 
-* **akamai_account**: Your specific contract and group IDs found in Akamai Control Center.
-* **akamai_edgeworker**:
-    * **harperRedirectBaseUrl**: The endpoint the EdgeWorker will call. This must be a hostname on Akamai. This is injected into the JavaScript source during the bootstrap process.
-* **akamai_property**:
-    * **edgeHostname**: The target Akamai hostname (must end in `.akamaized.net`). If using a custom hostname, set createHostname to false. After bootstrap completion you can edit the property in property manager to add your hostname and deploy to staging.
-* **harper_app**:
-    * **deployUrl**: Your HarperDB instance URL (do not include port).
-    * **redirectorRepoUrl**: The package URL for the Harper component to deploy. Should be left as default.
-
-## Secrets and Credentials
-
-To run the workflow, you must configure the following Secrets in your GitHub repository settings.
+To run the workflow, you must configure the following Secrets in your GitHub repository settings under Settings > Secrets and variables > Actions.
 
 | Secret Name | Description |
 | :--- | :--- |
@@ -128,29 +121,42 @@ To run the workflow, you must configure the following Secrets in your GitHub rep
 
 Harper user should have admin permissions.
 
-## The Bootstrap Workflow
+## 4. Configure Bootstrap Workflow
 
-The workflow is a manual dispatch process. When triggered, it performs the following steps:
+The bootstrap workflow is controlled by `bootstrap-config.json`. You must customize this file before running the workflow to deploy the stack.
 
-1.  **Harper Deployment**:
-    * Deploys the specified redirector application to your Harper instance.
-    * Waits for the application to report a healthy status.
-    * Ensures a `read_only_user` role exists.
-    * **Security Step**: Generates a random username and password, creates this user in HarperDB, and base64 encodes the credentials.
-2.  **EdgeWorker Build**:
-    * Injects the base64 Harper credential token into `main.js`.
-    * Injects the Harper Base URL into `main.js`.
-    * Bundles and uploads the EdgeWorker to Akamai.
-    * Activates the EdgeWorker on the Staging network.
-3.  **Property Provisioning**:
-    * Creates the Edge Hostname via PAPI (if it does not exist).
-    * Creates or updates the Property configuration based on the local JSON template.
-    * Updates the hostname mappings.
-    * Activates the Property on the Staging network.
-4.  **Data Ingestion**:
-    * Uploads the contents of `redirects/redirects.json` to the HarperDB instance to initialize the rule set.
+```json
+{
+  "akamai_account": {
+    "contractId": "ctr_1-ABC", # Found in Akamai Control Center > Hamburger Menu > Account Admin > Contracts
+    "groupId": "grp_12345" 
+  },
+  "akamai_edgeworker": {
+    "create": true, # Set to false if you already have an EdgeWorker
+    "name": "harper-redirect-worker", # Name of EdgeWorker
+    "resourceTierId": "200", # Dynamic Compute Tier ID
+    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net" # Base URL for Harper Redirects. Used in akamai_property to front end requests to Harper from EW
+  },
+  "akamai_property": {
+    "createProperty": true, # Set to false if you already have a property
+    "createHostname": true, # Set to false if you already have a hostname
+    "name": "harper-redirects", # Name of Property
+    "productId": "prd_Fresca", # Product ID: prod_Fresca = ION Standard; prd_SPM = ION Premier
+    "edgeHostname": "hdb-redirects-customername.akamaized.net", # Edge Hostname
+    "originHostname": "harper-redirects.clustername.harperfabric.com", # Harper Hostname
+    "sendHostHeader": "harper-redirects.clustername.harperfabric.com" # Host Header to send to Harper
+  },
+  "harper_app": {
+    "deploy": true, # Set to false if you already have a Harper Redirect App
+    "uploadRedirectJSON": true, # Set to false if you do not wish to deploy redirects to Harper during bootstrap
+    "deployUrl": "https://harper-redirects.clustername.harperfabric.com", # Harper URL
+    "redirectorRepoUrl": "https://github.com/HarperFast/template-redirector", # Harper Redirector Repo URL
+    "projectName": "harper-redirector" # Harper Project Name
+  }
+}
+```
 
-## Redirect Rules Format
+## 5. Configure Redirect Rules
 
 To define redirects, edit `redirects/redirects.json`.
 * Further details can be found in Harpers GitHub: https://github.com/HarperFast/template-redirector
@@ -184,10 +190,50 @@ To define redirects, edit `redirects/redirects.json`.
 	]
 }
 ```
+* Further details on the format can be found in Harpers GitHub: https://github.com/HarperFast/template-redirector
 
-## Local Development
+## 6. Commit and Push 
 
-If you wish to edit the EdgeWorker logic:
-1.  Navigate to `akamai/edgeworker/`.
-2.  Modify `main.js`.
-3.  Ensure you do not remove the placeholder strings `HARPER_TOKEN` or `HARPER_BASE_URL`, as the CI pipeline relies on these.
+Commit and push the changes to your repository. 
+
+```bash
+  git add bootstrap-config.json
+  git add redirects/redirects.json
+  git commit -m "Initial commit for bootstrap workflow"
+  git push origin main
+```
+
+## 7. Run the Bootstrap Workflow
+
+The workflow is a manual dispatch process. When triggered, it performs the following steps:
+
+1.  **Harper Deployment**:
+    * Deploys the specified redirector application to your Harper instance.
+    * Waits for the application to report a healthy status.
+    * Ensures a `read_only_user` role exists.
+    * **Security Step**: Generates a random username and password, creates this user in HarperDB, and base64 encodes the credentials.
+2.  **EdgeWorker Build**:
+    * Injects the base64 Harper credential token into `main.js`.
+    * Injects the Harper Base URL into `main.js`.
+    * Bundles and uploads the EdgeWorker to Akamai.
+    * Activates the EdgeWorker on the Staging and Production networks.
+3.  **Property Provisioning**:
+    * Creates the Edge Hostname via PAPI (if it does not exist).
+    * Creates or updates the Property configuration based on the local JSON template.
+    * Updates the hostname mappings.
+    * Activates the Property on the Staging and Production networks.
+4.  **Data Ingestion**:
+    * Uploads the contents of `redirects/redirects.json` to the HarperDB instance to populate initial redirect rules..
+
+### Trigger Workflow
+
+To trigger the workflow, navigate to the Actions tab in your GitHub repository and click on the "Bootstrap" workflow. 
+
+![image](.github/images/run-bootstrap-workflow.jpg)
+
+## 8. Add Edgeworker to your Akamai Property
+
+1. Navigate to your Akamai Property and add the EdgeWorker to the property: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/add-the-edgeworkers-behavior)
+2. Save & Deploy the property to staging.
+3. Test the redirects in staging
+  * If needed, debug with Enahnced debug headers: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/enable-enhanced-debug-headers)
