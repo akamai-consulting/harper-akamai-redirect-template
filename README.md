@@ -243,7 +243,7 @@ After the bootstrap workflow has completed, you can add the EdgeWorker to the Ak
 
 ### Update Redirects
 
-A separate workflow is provided to update redirects in HarperDB. To trigger the workflow, simple modify `redirects/redirects.json` and push the changes to your repository. The workflow will automatically detect the changes and update the redirects in HarperDB.
+A separate workflow is provided to update redirects in HarperDB. To trigger the workflow, simply modify `redirects/redirects.json` and push the changes to your repository. The workflow will automatically detect the changes and update the redirects in HarperDB.
 
 ### Update Edgeworker
 
