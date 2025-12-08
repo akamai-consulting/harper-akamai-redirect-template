@@ -53,7 +53,7 @@ sequenceDiagram
 * **Zero-Trust Setup:** The pipeline automatically generates a strong, unique password for the EdgeWorker, creates a restricted user in HarperDB, and injects the credentials into the EdgeWorker bundle at build time.
 
 ## Repository Structure
-
+```
 .
 ├── README.md
 ├── .github
@@ -68,7 +68,7 @@ sequenceDiagram
 ├── bootstrap-config.json                             # Bootstrap configuration file
 └── harper-redirects
     └── redirects.json                                # Redirect rules to implement in Harper
-
+```
 ## Prerequisites
 
 * Akamai API credentials with the following permissions:
