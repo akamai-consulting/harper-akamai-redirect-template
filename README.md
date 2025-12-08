@@ -110,7 +110,7 @@ To run the workflow, you must configure the following Secrets in your GitHub rep
 | `AKAMAI_CLIENT_TOKEN` | Client Token from your `.edgerc` file. |
 | `AKAMAI_CLIENT_SECRET` | Client Secret from your `.edgerc` file. |
 | `AKAMAI_ACCESS_TOKEN` | Access Token from your `.edgerc` file. |
-| `HARBOR_USER` | Username for HarperDB/Harbor authentication (Platform User). |
+| `HARBOR_USER` | Username for HarperDB/Harbor authentication (superuser). |
 | `HARBOR_PASSWORD` | Password for HarperDB/Harbor authentication. |
 
 *Optional:* If you are using a partner account, you may define `ACCOUNT_SWITCH_KEY` as a repository variable.
@@ -159,7 +159,6 @@ The bootstrap workflow is controlled by `bootstrap-config.json`. You must custom
 ## 5. Configure Redirect Rules
 
 To define redirects, edit `redirects/redirects.json`.
-* Further details can be found in Harpers GitHub: https://github.com/HarperFast/template-redirector
 
 | Name | Required | Description |
 | :--- | :--- | :--- | 
@@ -227,13 +226,25 @@ The workflow is a manual dispatch process. When triggered, it performs the follo
 
 ### Trigger Workflow
 
-To trigger the workflow, navigate to the Actions tab in your GitHub repository and click on the "Bootstrap" workflow. 
+To trigger the workflow, navigate to the Actions tab in your GitHub repository and click on the "Bootstrap" workflow., then click "Run Workflow".
 
 ![image](.github/images/run-bootstrap-workflow.jpg)
 
 ## 8. Add Edgeworker to your Akamai Property
 
-1. Navigate to your Akamai Property and add the EdgeWorker to the property: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/add-the-edgeworkers-behavior)
+After the bootstrap workflow has completed, you can add the EdgeWorker to the Akamai property where you want redirects to be implemented.
+
+1. Navigate to your Akamai Property and add the EdgeWorker behavior: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/add-the-edgeworkers-behavior)
 2. Save & Deploy the property to staging.
 3. Test the redirects in staging
-  * If needed, debug with Enahnced debug headers: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/enable-enhanced-debug-headers)
+    * If needed, debug with Enhanced Debug Headers: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/enable-enhanced-debug-headers)
+
+## Ongoing Management
+
+### Update Redirects
+
+A separate workflow is provided to update redirects in HarperDB. To trigger the workflow, simple modify `redirects/redirects.json` and push the changes to your repository. The workflow will automatically detect the changes and update the redirects in HarperDB.
+
+### Update Edgeworker
+
+A separate workflow is provided to update the Edgeworker. To trigger the workflow, simple modify `main.js` and `bundle.json` and push the changes to your repository. The workflow will automatically detect the changes and update the Edgeworker in Akamai staging.
