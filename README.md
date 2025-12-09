@@ -58,7 +58,8 @@ sequenceDiagram
 ├── README.md
 ├── .github
 │   └── workflows
-│       └── bootstrap-akamai.yml                      # GitHub Action Workflow for bootstrapping Akamai Redirect Stack  
+│       └── bootstrap-akamai.yml                      # GitHub Action Workflow for bootstrapping Akamai Redirect Stack
+│       └── manage-harper-redirects.yml               # GitHub Action Workflow for managing Harper Redirects
 ├── akamai
 │   ├── edgeworker
 │   │   ├── bundle.json                               # Akamai EdgeWorker bundle configuration
