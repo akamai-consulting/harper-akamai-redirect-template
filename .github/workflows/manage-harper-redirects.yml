@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Check if Bootstrap has run
         id: check_bootstrap
@@ -55,6 +57,94 @@ jobs:
           fi
           
           echo "deployUrl=$deployUrl" >> $GITHUB_OUTPUT
+
+      - name: Sync Deletions
+        if: steps.check_bootstrap.outputs.bootstrapped == 'true'
+        env:
+          HARPER_DEPLOY_URL: ${{ steps.config.outputs.deployUrl }}
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          cat <<EOF > sync_deletions.py
+          import os
+          import json
+          import subprocess
+          import urllib.request
+          import urllib.parse
+          import ssl
+          import base64
+
+          FILE_PATH = 'harper-redirects/redirects.json'
+          DEPLOY_URL = os.environ.get('HARPER_DEPLOY_URL')
+          HARBOR_USER = os.environ.get('HARBOR_USER')
+          HARBOR_PASSWORD = os.environ.get('HARBOR_PASSWORD')
+
+          def get_file_content(commit):
+              try:
+                  cmd = ['git', 'show', f'{commit}:{FILE_PATH}']
+                  val = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8')
+                  return json.loads(val)
+              except Exception:
+                  return {'data': []}
+
+          def run():
+              if not (DEPLOY_URL and HARBOR_USER and HARBOR_PASSWORD):
+                  print("::error::Missing required environment variables for deletion sync")
+                  exit(1)
+
+              print(f"Comparing HEAD to HEAD~1 for {FILE_PATH}...")
+              
+              # Load Current (from disk)
+              try:
+                  with open(FILE_PATH, 'r') as f:
+                      current_data = json.load(f).get('data', [])
+              except FileNotFoundError:
+                  print("Current file not found, assuming all deleted or empty.")
+                  current_data = []
+
+              # Load Previous (from git history)
+              previous_data = get_file_content('HEAD~1').get('data', [])
+
+              current_paths = {r['path'] for r in current_data}
+              to_delete = [r for r in previous_data if r['path'] not in current_paths]
+              
+              print(f"Found {len(to_delete)} redirects to delete.")
+
+              if not to_delete:
+                  return
+
+              auth_str = f"{HARBOR_USER}:{HARBOR_PASSWORD}"
+              b64_auth = base64.b64encode(auth_str.encode()).decode()
+              
+              ctx = ssl.create_default_context()
+              ctx.check_hostname = False
+              ctx.verify_mode = ssl.CERT_NONE
+
+              headers = {
+                  "Authorization": f"Basic {b64_auth}"
+              }
+
+              for item in to_delete:
+                  path = item['path']
+                  # DELETE /rule/?path=...
+                  # Ensure path is properly quoted
+                  encoded_path = urllib.parse.quote(path)
+                  url = f"{DEPLOY_URL}/rule/?path={encoded_path}"
+                  
+                  req = urllib.request.Request(url, method='DELETE', headers=headers)
+                  
+                  try:
+                      print(f"Deleting path: {path}")
+                      urllib.request.urlopen(req, context=ctx)
+                  except Exception as e:
+                      # We log but continue, as requested by user ("scalability issue" concern -> best effort clean up)
+                      print(f"::warning::Failed to delete {path}: {e}")
+
+          if __name__ == '__main__':
+              run()
+          EOF
+          
+          python3 sync_deletions.py
 
       - name: Upload Redirects
         if: steps.check_bootstrap.outputs.bootstrapped == 'true'
