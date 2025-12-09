@@ -1,0 +1,74 @@
+name: Manage Harper Redirects
+
+on:
+  push:
+    paths:
+      - 'harper-redirects/redirects.json'
+  workflow_dispatch:
+
+jobs:
+  update-redirects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if Bootstrap has run
+        id: check_bootstrap
+        run: |
+          echo "Checking for successful bootstrap runs..."
+          # Fetch successful runs of bootstrap-akamai.yml
+          count=$(gh run list --workflow bootstrap-akamai.yml --status success --json status | jq length)
+          
+          if [ "$count" -gt 0 ]; then
+            echo "Bootstrap has run successfully."
+            echo "bootstrapped=true" >> $GITHUB_OUTPUT
+          else
+            echo "Bootstrap has NOT run successfully. Skipping update."
+            echo "bootstrapped=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.check_bootstrap.outputs.bootstrapped == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq httpie
+
+      - name: Load Configuration
+        id: config
+        if: steps.check_bootstrap.outputs.bootstrapped == 'true'
+        run: |
+          FILE="bootstrap-config.json"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::Config file $FILE not found"
+            exit 1
+          fi
+          
+          # Extract deployUrl
+          deployUrl=$(jq -r '.harper_app.deployUrl // empty' "$FILE")
+          
+          if [ -z "$deployUrl" ]; then
+             echo "::error::harper_app.deployUrl missing in $FILE"
+             exit 1
+          fi
+          
+          echo "deployUrl=$deployUrl" >> $GITHUB_OUTPUT
+
+      - name: Upload Redirects
+        if: steps.check_bootstrap.outputs.bootstrapped == 'true'
+        env:
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          UPLOAD_URL: ${{ steps.config.outputs.deployUrl }}/redirect
+        run: |
+          if [ -z "$HARBOR_USER" ] || [ -z "$HARBOR_PASSWORD" ]; then
+             echo "::error::Missing HARBOR_USER or HARBOR_PASSWORD secrets"
+             exit 1
+          fi
+
+          echo "Uploading harper-redirects/redirects.json to $UPLOAD_URL"
+          
+          http --ignore-stdin --check-status -a "$HARBOR_USER:$HARBOR_PASSWORD" \
+            POST "$UPLOAD_URL" \
+            Content-Type:application/json \
+            @harper-redirects/redirects.json

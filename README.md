@@ -226,7 +226,7 @@ The workflow is a manual dispatch process. When triggered, it performs the follo
 
 ### Trigger Workflow
 
-To trigger the workflow, navigate to the Actions tab in your GitHub repository and click on the "Bootstrap" workflow., then click "Run Workflow".
+To trigger the workflow, navigate to the Actions tab in your GitHub repository and click on the "Bootstrap" workflow, then click "Run Workflow".
 
 ![image](.github/images/run-bootstrap-workflow.jpg)
 
@@ -243,7 +243,7 @@ After the bootstrap workflow has completed, you can add the EdgeWorker to the Ak
 
 ### Update Redirects
 
-A separate workflow is provided to update redirects in HarperDB. To trigger the workflow, simply modify `redirects/redirects.json` and push the changes to your repository. The workflow will automatically detect the changes and update the redirects in HarperDB.
+A separate workflow is provided to update redirects in HarperDB. To trigger the workflow, simply modify `redirects/redirects.json` and push the changes to your repository. The workflow will automatically detect the changes and push the redirects to HarperDB.
 
 ### Update Edgeworker
 
