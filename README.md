@@ -87,11 +87,11 @@ sequenceDiagram
 1. Create Akamai API Credentials: [Documentation](https://techdocs.akamai.com/onboard/docs/set-up-identity-and-access-api#4-set-up-authentication-credentials)
 2. Gather Akamai Account Details:
    * Contract ID: Hamburger Menu > Account Admin > Contracts
-   * Group ID: 
+   * Group ID: Hamburger Menu > CDN > Properties > Select Target Group > Group ID is located in the URL '.../groups/{group_id}/properties'
 3. Create Harper Cluster
    * If needed create Harper Fabric account: [Documentation](https://fabric.harper.fast/#/sign-up)
    * Create cluster in Fabric: [Documentation](https://docs.harperdb.io/docs/getting-started/installation#manage-and-deploy-with-fabric)
-   * Grab cluster URL and superuser credentials
+   * Retain the Admin credentials and the Application URL found under the Config pane of your cluster for steps 3 and 4.
 
 > [!NOTE]
 > If you wish to deploy your Harper cluster on Akamai, please work with your Akamai and Harper representative to have your Fabric account designated to use Akamai's Compute Cloud prior to cluster creation.
@@ -108,14 +108,14 @@ sequenceDiagram
 
 To run the workflow, you must configure the following Secrets in your GitHub repository settings under Settings > Secrets and variables > Actions.
 
-| Secret Name | Description |
-| :--- | :--- |
-| `AKAMAI_HOST` | API Endpoint from your `.edgerc` file. |
-| `AKAMAI_CLIENT_TOKEN` | Client Token from your `.edgerc` file. |
-| `AKAMAI_CLIENT_SECRET` | Client Secret from your `.edgerc` file. |
-| `AKAMAI_ACCESS_TOKEN` | Access Token from your `.edgerc` file. |
-| `HARBOR_USER` | Username for HarperDB/Harbor authentication (superuser). |
-| `HARBOR_PASSWORD` | Password for HarperDB/Harbor authentication. |
+4. Create GitHub Repository Secrets: Settings > Secrets and variables > Actions > New repository secret
+   * `AKAMAI_HOST`: From Edgerc
+   * `AKAMAI_ACCESS_TOKEN`: From Edgerc
+   * `AKAMAI_CLIENT_TOKEN`: From Edgerc
+   * `AKAMAI_CLIENT_SECRET`: From Edgerc
+   * `HARBOR_USER`: HarperDB Cloud Username
+   * `HARBOR_PASSWORD`: HarperDB Cloud Password
+   * `GH_PAT` (Optional but Recommended): A Personal Access Token with `repo` scope. Required if the default `GITHUB_TOKEN` does not have permission to write Repository Secrets (needed to save the Harper Token).
 
 *Optional:* If you are using a partner account, you may define `ACCOUNT_SWITCH_KEY` as a repository variable.
 
