@@ -101,10 +101,17 @@ jobs:
           # 'akamai edgeworkers list-versions' json output structure:
           # { "data": [ { "version": "1.23", ... }, ... ] }
           
-          VERSIONS_JSON=$(akamai edgeworkers list-versions "$EDGEWORKER_ID" --json "${PM_ARGS[@]}" || echo '{"data":[]}')
+          VERSIONS_OUT=$(mktemp)
+          akamai edgeworkers list-versions "$EDGEWORKER_ID" --json "${PM_ARGS[@]}" > "$VERSIONS_OUT" 2>&1 || true
+          
+          # Clean up output: strip everything before the first '{' (if it's an object) or '[' (if it's an array, though usually object with 'data')
+          # The error logs showed text appearing before JSON.
+          # Use sed to only keep from the first '{' onwards.
+          sed -i 's/^[^{]*//' "$VERSIONS_OUT"
           
           # Extract latest version. If no versions, default to 0.0
-          LATEST_VERSION=$(echo "$VERSIONS_JSON" | jq -r '[.data[].version] | sort_by(split(".") | map(tonumber)) | last // "0.0"')
+          # We use cat to pipe content to jq, providing a default empty data if parse fails
+          LATEST_VERSION=$(cat "$VERSIONS_OUT" | jq -r '[.data[].version] | sort_by(split(".") | map(tonumber)) | last // "0.0"' || echo "0.0")
           
           echo "Latest version on Akamai: $LATEST_VERSION"
           
