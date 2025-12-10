@@ -1,0 +1,172 @@
+name: Deploy EdgeWorker to Staging
+
+on:
+  push:
+    paths:
+      - 'akamai/edgeworker/main.js'
+  workflow_dispatch:
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    env:
+      ACCOUNT_SWITCH_KEY: ${{ vars.ACCOUNT_SWITCH_KEY }}
+      EDGEWORKER_ID: ${{ vars.EDGEWORKER_ID }}
+      HARPER_TOKEN: ${{ secrets.HARPER_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Akamai CLI and required packages
+        run: |
+          curl -sL -o $RUNNER_TEMP/akamai https://github.com/akamai/cli/releases/download/v2.0.2/akamai-v2.0.2-linuxamd64
+          chmod +x $RUNNER_TEMP/akamai
+          sudo mv $RUNNER_TEMP/akamai /usr/local/bin/akamai
+          akamai install edgeworkers
+
+      - name: Configure Akamai CLI credentials
+        env:
+          AKAMAI_HOST: ${{ secrets.AKAMAI_HOST }}
+          AKAMAI_CLIENT_TOKEN: ${{ secrets.AKAMAI_CLIENT_TOKEN }}
+          AKAMAI_CLIENT_SECRET: ${{ secrets.AKAMAI_CLIENT_SECRET }}
+          AKAMAI_ACCESS_TOKEN: ${{ secrets.AKAMAI_ACCESS_TOKEN }}
+        run: |
+          # Fail if any required secrets are missing/empty
+          missing=()
+          for var in AKAMAI_HOST AKAMAI_CLIENT_TOKEN AKAMAI_CLIENT_SECRET AKAMAI_ACCESS_TOKEN; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error title=Missing secret::$var is not set."
+              missing+=("$var")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            exit 1
+          fi
+
+          cat > ~/.edgerc <<EOF
+          [default]
+          host = $AKAMAI_HOST
+          client_token = $AKAMAI_CLIENT_TOKEN
+          client_secret = $AKAMAI_CLIENT_SECRET
+          access_token = $AKAMAI_ACCESS_TOKEN
+          EOF
+
+      - name: Check for required variables
+        run: |
+          if [ -z "${EDGEWORKER_ID}" ]; then
+            echo "::error::EDGEWORKER_ID variable is missing. It should have been saved by the bootstrap workflow."
+            exit 1
+          fi
+          if [ -z "${HARPER_TOKEN}" ]; then
+            echo "::error::HARPER_TOKEN secret is missing. It should have been saved by the bootstrap workflow."
+            exit 1
+          fi
+
+      - name: Load Akamai config (for Harper URL)
+        id: cfg
+        run: |
+          FILE="bootstrap-config.json"
+          jq -e . "$FILE" >/dev/null || { echo "Invalid JSON $FILE"; exit 1; }
+          get() { jq -r "$1 // \"\"" "$FILE"; }
+          
+          harper_base_url=$(get '.akamai_edgeworker.harperRedirectBaseUrl')
+          echo "harper_base_url=$harper_base_url" >> $GITHUB_OUTPUT
+
+      - name: Inject Configuration into EdgeWorker
+        run: |
+          # Inject HARPER_TOKEN
+          # We use a secure way to sed by passing env var if possible, but basic sed works for simple replacement if we are careful.
+          # The placeholder is: const HARPER_TOKEN = '';
+          # We replaced it in bootstrap, but here we are checking out fresh code from repo, so it is the template placeholder.
+          
+          # Check if the placeholder exists or if it was committed differently.
+          # The repo file likely has `const HARPER_TOKEN = '';` or similar.
+          
+          # Inject HARPER_TOKEN
+          sed -i "s|const HARPER_TOKEN = '.*';|const HARPER_TOKEN = '${HARPER_TOKEN}';|" akamai/edgeworker/main.js
+
+          # Inject HARPER_BASE_URL
+          HARPER_BASE_URL="${{ steps.cfg.outputs.harper_base_url }}"
+          if [ -n "$HARPER_BASE_URL" ]; then
+             sed -i "s|const HARPER_BASE_URL = 'https://YOUR-HARPER-HOST/checkredirect';|const HARPER_BASE_URL = '${HARPER_BASE_URL}';|" akamai/edgeworker/main.js
+          else
+             echo "::warning::harper_base_url is empty in bootstrap-config.json"
+          fi
+
+      - name: Increment EdgeWorker Version
+        id: version
+        run: |
+          # Fetch latest versions
+          PM_ARGS=()
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            PM_ARGS+=(--accountkey "$ACCOUNT_SWITCH_KEY")
+          fi
+
+          echo "Fetching versions for EdgeWorker ID $EDGEWORKER_ID..."
+          
+          # Get versions JSON, sort by versionId (numeric descending if possible, or try to parse)
+          # 'akamai edgeworkers list-versions' json output structure:
+          # { "data": [ { "version": "1.23", ... }, ... ] }
+          
+          VERSIONS_JSON=$(akamai edgeworkers list-versions "$EDGEWORKER_ID" --json "${PM_ARGS[@]}" || echo '{"data":[]}')
+          
+          # Extract latest version. If no versions, default to 0.0
+          LATEST_VERSION=$(echo "$VERSIONS_JSON" | jq -r '[.data[].version] | sort_by(split(".") | map(tonumber)) | last // "0.0"')
+          
+          echo "Latest version on Akamai: $LATEST_VERSION"
+          
+          # Increment version logic
+          # Split by dot
+          IFS='.' read -r -a PARTS <<< "$LATEST_VERSION"
+          
+          # If simple integer, just increment
+          if [ "${#PARTS[@]}" -eq 1 ]; then
+             NEW_VERSION=$((PARTS[0] + 1))
+          else
+             # Increment the last part
+             LAST_IDX=$((${#PARTS[@]} - 1))
+             PARTS[$LAST_IDX]=$((PARTS[$LAST_IDX] + 1))
+             
+             # Rejoin
+             NEW_VERSION=$(IFS=. ; echo "${PARTS[*]}")
+          fi
+          
+          echo "New version will be: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Update bundle.json
+          TMP_BUNDLE=$(mktemp)
+          jq --arg ver "$NEW_VERSION" '.["edgeworker-version"] = $ver' akamai/edgeworker/bundle.json > "$TMP_BUNDLE" && mv "$TMP_BUNDLE" akamai/edgeworker/bundle.json
+          
+          echo "Updated akamai/edgeworker/bundle.json with version $NEW_VERSION"
+          cat akamai/edgeworker/bundle.json
+
+      - name: Upload EW bundle
+        run: |
+          cd akamai/edgeworker
+          tar -czvf ew-bundle.tar.gz --exclude='.*' *
+          
+          PM_ARGS=()
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            PM_ARGS+=(--accountkey "$ACCOUNT_SWITCH_KEY")
+          fi
+
+          echo "Uploading EdgeWorker bundle for ID $EDGEWORKER_ID..."
+          akamai edgeworkers upload \
+            --bundle ew-bundle.tar.gz \
+            "${PM_ARGS[@]}" \
+            "$EDGEWORKER_ID"
+
+      - name: Activate EW on staging
+        run: |
+          PM_ARGS=()
+          if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
+            PM_ARGS+=(--accountkey "$ACCOUNT_SWITCH_KEY")
+          fi
+          
+          echo "Activating EdgeWorker ID $EDGEWORKER_ID on STAGING..."
+          akamai edgeworkers activate "$EDGEWORKER_ID" \
+            staging \
+            0.1 \
+            "${PM_ARGS[@]}"
