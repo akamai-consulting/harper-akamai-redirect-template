@@ -108,14 +108,14 @@ sequenceDiagram
 
 To run the workflow, you must configure the following Secrets in your GitHub repository settings under Settings > Secrets and variables > Actions.
 
-4. Create GitHub Repository Secrets: Settings > Secrets and variables > Actions > New repository secret
-   * `AKAMAI_HOST`: From Edgerc
-   * `AKAMAI_ACCESS_TOKEN`: From Edgerc
-   * `AKAMAI_CLIENT_TOKEN`: From Edgerc
-   * `AKAMAI_CLIENT_SECRET`: From Edgerc
-   * `HARBOR_USER`: HarperDB Cloud Username
-   * `HARBOR_PASSWORD`: HarperDB Cloud Password
-   * `GH_PAT` (Optional but Recommended): A Personal Access Token with `repo` scope. Required if the default `GITHUB_TOKEN` does not have permission to write Repository Secrets (needed to save the Harper Token).
+| Secret Name | Description |
+| :--- | :--- |
+| `AKAMAI_HOST` | API Endpoint from your `.edgerc` file. |
+| `AKAMAI_CLIENT_TOKEN` | Client Token from your `.edgerc` file. |
+| `AKAMAI_CLIENT_SECRET` | Client Secret from your `.edgerc` file. |
+| `AKAMAI_ACCESS_TOKEN` | Access Token from your `.edgerc` file. |
+| `HARBOR_USER` | Username for HarperDB/Harbor authentication (superuser). |
+| `HARBOR_PASSWORD` | Password for HarperDB/Harbor authentication. |
 
 *Optional:* If you are using a partner account, you may define `ACCOUNT_SWITCH_KEY` as a repository variable.
 
