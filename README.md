@@ -68,7 +68,7 @@ sequenceDiagram
 │       └── harper-redirect-template.v1.default.json  # Akamai Property Manager JSON rule template
 ├── bootstrap-config.json                             # Bootstrap configuration file
 └── harper-redirects
-    └── redirects.json                                # Redirect rules to implement in Harper
+    └── redirects.json                                # Example redirects.json file
 ```
 ## Prerequisites
 
@@ -159,7 +159,14 @@ The bootstrap workflow is controlled by `bootstrap-config.json`. You must custom
 
 ## 5. Configure Redirect Rules
 
-To define redirects, edit `redirects/redirects.json`.
+To define redirects, create or edit any `.json` file within the `harper-redirects/` directory. You can create multiple files to organize your redirects (e.g., `campaigns.json`, `legacy.json`).
+
+> [!TIP]
+> **GitOps Best Practice**
+> To ensure your Pull Requests remain readable and your Git performance stays high, we recommend keeping individual JSON files under **50,000 records** (or roughly 10MB).
+> 
+> *   **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
+> *   **Performance**: The automated workflow processes files faster when they are split logically rather than one monolithic file.
 
 | Name | Required | Description |
 | :--- | :--- | :--- | 
@@ -223,7 +230,7 @@ The workflow is a manual dispatch process. When triggered, it performs the follo
     * Updates the hostname mappings.
     * Activates the Property on the Staging and Production networks.
 4.  **Data Ingestion**:
-    * Uploads the contents of `redirects/redirects.json` to the HarperDB instance to populate initial redirect rules.
+    * Uploads the contents of `harper-redirects/*.json` to the HarperDB instance to populate initial redirect rules.
 
 ### Trigger Workflow
 
@@ -244,11 +251,20 @@ After the bootstrap workflow has completed, you can add the EdgeWorker to the Ak
 
 ### Update Redirects
 
-A separate workflow (manage-harper-redirects.yml) is provided to update redirects in HarperDB. To trigger the workflow, simply modify `redirects/redirects.json` and push the changes to your repository. The workflow will do two things:
-1. Compare the new version of redirects.json to the previously commited version and delete any redirects on HarperDB that are no longer present.
-2. Upload the new version of redirects.json to HarperDB.
+A separate workflow (`manage-harper-redirects.yml`) handles redirect updates. To trigger it, add or modify any `.json` file in the `harper-redirects/` directory (e.g., `brand-campaigns.json`, `legacy-migration.json`) and push the changes.
 
-This keeps your HarperDB cluster in sync with your redirects.json file, making this repository the source of truth for redirects.
+The workflow detects which files were changed and for each file:
+1.  **Syncs Deletions**: Compares the new version to the previous commit and deletes any redirects from HarperDB that were removed from the file.
+2.  **Uploads Changes**: Uploads the current version of the file to HarperDB, adding or updating the redirects.
+
+This multi-file approach allows you to organize massive numbers of redirects (e.g., by campaign, region, or legacy site) while ensuring HarperDB remains perfectly in sync with your repository as the source of truth.
+
+> [!TIP]
+> **GitOps Best Practice**
+> To ensure your Pull Requests remain readable and your Git performance stays high, we recommend keeping individual JSON files under **50,000 records** (or roughly 10MB).
+> 
+> *   **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
+> *   **Performance**: The automated workflow processes files faster when they are split logically (e.g., `2024-marketing.json`, `legacy-site-a.json`) rather than one monolithic file.
 
 ### Update Edgeworker
 

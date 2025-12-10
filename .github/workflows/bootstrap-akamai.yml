@@ -577,7 +577,7 @@ jobs:
             "${PM_ARGS[@]}"
       
           
-      - name: Upload redirects.json to Harper
+      - name: Upload all redirects to Harper
         if: ${{ steps.cfg.outputs.flag_upload_json == 'true' }}
         env:
           HARBOR_USER: ${{ secrets.HARBOR_USER }}
@@ -597,9 +597,21 @@ jobs:
           fi
 
           UPLOAD_URL="${HARPER_DEPLOY_URL}/redirect"
-          echo "Uploading redirects/redirects.json to ${UPLOAD_URL} with basic auth"
-
-          http --ignore-stdin --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
-            POST "${UPLOAD_URL}" \
-            Content-Type:application/json \
-            @harper-redirects/redirects.json
+          
+          # Enable nullglob to handle case where no json files exist
+          shopt -s nullglob
+          
+          FILES=(harper-redirects/*.json)
+          
+          if [ ${#FILES[@]} -eq 0 ]; then
+             echo "::warning::No JSON files found in harper-redirects/ to upload."
+             exit 0
+          fi
+          
+          for file in "${FILES[@]}"; do
+            echo "Uploading $file to ${UPLOAD_URL}..."
+            http --ignore-stdin --check-status -a "${HARBOR_USER}:${HARBOR_PASSWORD}" \
+              POST "${UPLOAD_URL}" \
+              Content-Type:application/json \
+              @"$file"
+          done
