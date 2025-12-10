@@ -101,18 +101,27 @@ jobs:
           # 'akamai edgeworkers list-versions' json output structure:
           # { "data": [ { "version": "1.23", ... }, ... ] }
           
-          VERSIONS_OUT=$(mktemp)
-          akamai edgeworkers list-versions "$EDGEWORKER_ID" --json "${PM_ARGS[@]}" > "$VERSIONS_OUT" 2>&1 || true
+          OUT="$RUNNER_TEMP/ew_versions.json"; ERR="$RUNNER_TEMP/ew_versions.err"
+          set +e
+          akamai edgeworkers list-versions "$EDGEWORKER_ID" --json "${PM_ARGS[@]}" 1>"$OUT" 2>"$ERR"
+          set -e
           
-          # Clean up output: strip everything before the first '{' (if it's an object) or '[' (if it's an array, though usually object with 'data')
+          # Clean up output: strip everything before the first '{' (if it's an object) or '[' (if it's an array)
           # The error logs showed text appearing before JSON.
-          # Use sed to only keep from the first '{' onwards.
-          sed -i 's/^[^{]*//' "$VERSIONS_OUT"
+          sed -i 's/^[^{]*//' "$OUT"
           
-          # Extract latest version. If no versions, default to 0.0
-          # We use cat to pipe content to jq, providing a default empty data if parse fails
-          LATEST_VERSION=$(cat "$VERSIONS_OUT" | jq -r '[.data[].version] | sort_by(split(".") | map(tonumber)) | last // "0.0"' || echo "0.0")
+          # Extract latest version.
+          LATEST_VERSION=$(cat "$OUT" | jq -r '[.data[].version] | sort_by(split(".") | map(tonumber)) | last // empty')
           
+          if [ -z "$LATEST_VERSION" ]; then
+             echo "::error::Could not parse latest version from Akamai CLI output."
+             echo "stdout content:"
+             cat "$OUT"
+             echo "stderr content:"
+             cat "$ERR"
+             exit 1
+          fi
+
           echo "Latest version on Akamai: $LATEST_VERSION"
           
           # Increment version logic
