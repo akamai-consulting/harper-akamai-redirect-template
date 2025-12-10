@@ -14,10 +14,10 @@
 		{
 			"utcStartTime": "",
 			"utcEndTime": "",
-			"path": "/shop/widgets2",
+			"path": "/shop/widgets3",
 			"host": "",
 			"version": "0",
-			"redirectURL": "/s/widgets2",
+			"redirectURL": "/s/widgets3",
 			"operations": "",
 			"statusCode": "301",
 			"regex": 0
