@@ -107,9 +107,8 @@ jobs:
           set -e
           
           # Clean up output: strip everything before the first '{' (if it's an object) or '[' (if it's an array)
-          # We use a character class [^{[] to match anything that is neither { nor [.
-          # Note: In regex, [^{[] means "not { and not [".
-          sed -i 's/^[^[{]*//' "$OUT"
+          # We check only the first line to avoid corrupting pretty-printed JSON on subsequent lines.
+          sed -i '1s/^[^[{]*//' "$OUT"
           
           # Extract latest version.
           # We append "|| true" so that if jq fails (e.g. bad JSON), the script continues to the error check below
