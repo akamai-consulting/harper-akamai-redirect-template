@@ -129,6 +129,16 @@ Harper user should have admin permissions.
 
 The bootstrap workflow is controlled by `bootstrap-config.json`. You must customize this file before running the workflow to deploy the stack.
 
+[!NOTE]
+> Most of the values in this file can be left as default. Only the following values should be modified:
+> * `akamai_account.contractId`
+> * `akamai_account.groupId`
+> * `akamai_edgeworker.harperRedirectBaseUrl`
+> * `akamai_property.edgeHostname`
+> * `akamai_property.originHostname`
+> * `akamai_property.sendHostHeader`
+> * `harper_app.deployUrl`
+
 ```json
 {
   "akamai_account": {
@@ -139,14 +149,14 @@ The bootstrap workflow is controlled by `bootstrap-config.json`. You must custom
     "create": true, # Set to false if you already have an EdgeWorker
     "name": "harper-redirect-worker", # Name of EdgeWorker
     "resourceTierId": "200", # Dynamic Compute Tier ID
-    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net" # Base URL for Harper Redirects. Used in akamai_property to front end requests to Harper from EW
+    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net" # Base URL for Harper Redirects. Defined in akamai_property.EdgeHostname and used to front end requests to Harper from the EW.
   },
   "akamai_property": {
     "createProperty": true, # Set to false if you already have a property
     "createHostname": true, # Set to false if you already have a hostname
     "name": "harper-redirects", # Name of Property
     "productId": "prd_Fresca", # Product ID: prod_Fresca = ION Standard; prd_SPM = ION Premier
-    "edgeHostname": "hdb-redirects-customername.akamaized.net", # Edge Hostname
+    "edgeHostname": "hdb-redirects-customername.akamaized.net", # Edge Hostname. Only akamaized.net hostnames are supported by this workflow.
     "originHostname": "harper-redirects.clustername.harperfabric.com", # Harper Hostname
     "sendHostHeader": "harper-redirects.clustername.harperfabric.com" # Host Header to send to Harper
   },

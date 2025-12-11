@@ -1,32 +1,28 @@
 {
   "akamai_account": {
-    "contractId": "C-1ED34DY",
-    "groupId": "265792"        
+    "contractId": "ctr_1-ABC",
+    "groupId": "grp_12345"
   },
-
   "akamai_edgeworker": {
     "create": true,
-    "name": "harper-redirector-ew",
-    "resourceTierId": 200,
-    "harperRedirectBaseUrl": "https://harper-redirects.akamaized.net"
+    "name": "harper-redirect-worker",
+    "resourceTierId": "200",
+    "harperRedirectBaseUrl": "https://harper-redirects-customername.akamaized.net"
   },
-
   "akamai_property": {
     "createProperty": true,
     "createHostname": true,
+    "name": "harper-redirects",
     "productId": "prd_Fresca",
-    "network": "enhancedTLS",
-    "name": "harper-redirect-ew-subrequests",
-    "edgeHostname": "harper-redirects.akamaized.net",
-    "originHostname": "harper-redirects.hicks.harperfabric.com",
-    "sendHostHeader": "harper-redirects.hicks.harperfabric.com"
+    "edgeHostname": "hdb-redirects-customername.akamaized.net",
+    "originHostname": "harper-redirects.clustername.harperfabric.com",
+    "sendHostHeader": "harper-redirects.clustername.harperfabric.com"
   },
-
   "harper_app": {
     "deploy": true,
     "uploadRedirectJSON": true,
-    "deployUrl": "https://harper-redirects.hicks.harperfabric.com",
+    "deployUrl": "https://harper-redirects.clustername.harperfabric.com",
     "redirectorRepoUrl": "https://github.com/HarperFast/template-redirector",
-    "projectName": "redirector"
+    "projectName": "harper-redirector"
   }
 }
