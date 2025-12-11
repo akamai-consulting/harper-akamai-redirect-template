@@ -25,7 +25,3 @@ build/
 .env
 .env.local
 .env.*.local
-
-# Warp
-WARP.md
-devops-logs.log
