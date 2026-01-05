@@ -47,12 +47,13 @@ sequenceDiagram
 
 ## Features
 
-* **Infrastructure as Code:** 
+* **Infrastructure as Code:**
   * Includes a GitHub Action Workflow ("Bootstrap Akamai Redirect Stack") that provisions the entire stack (EdgeWorker, Akamai Property, Edge Hostname, Harper Redirect Application, Harper Database role/user).
   * Supports uploading any number of .json redirect files to populate rules immediately upon deployment. Subsequent commits of .json files will be reconciled to Harper using GitHub Actions. This keeps your HarperDB cluster in sync with your .json redirect files, making this repository the source of truth for redirects.
 * **Secrets Handling:** The pipeline automatically creates an RBAC user in HarperDB with read-only access and injects the credentials into the EdgeWorker bundle at build time.
 
 ## Repository Structure
+
 ```
 .
 ├── README.md
@@ -71,6 +72,7 @@ sequenceDiagram
 └── harper-redirects
     └── redirects.json                                # Example redirects.json file
 ```
+
 ## Prerequisites
 
 * Akamai API credentials with the following permissions:
@@ -85,6 +87,7 @@ sequenceDiagram
   * Harper ClusterURL
 
 ## 1. Gather Prerequisites
+
 1. Create Akamai API Credentials: [Documentation](https://techdocs.akamai.com/onboard/docs/set-up-identity-and-access-api#4-set-up-authentication-credentials)
 2. Gather Akamai Account Details from Control Center
    * Contract ID: Hamburger Menu > Account Admin > Contracts
@@ -126,6 +129,7 @@ The bootstrap workflow is controlled by `bootstrap-config.json`. You must custom
 
 > [!NOTE]
 > Most of the values in this file can be left as default. Only the following values need to be modified:
+>
 > * `akamai_account.contractId`
 > * `akamai_account.groupId`
 > * `akamai_edgeworker.harperRedirectBaseUrl`
@@ -171,32 +175,32 @@ To define redirects, create or edit any `.json` file within the `harper-redirect
 
 > [!NOTE]
 > To ensure your Pull Requests remain readable and your Git performance stays high, we recommend keeping individual JSON files under **50,000 - 100,000 records**.
-> 
-> *   **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
-> *   **Performance**: The automated workflow processes files faster when they are split logically rather than one monolithic file.
+>
+> * **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
+> * **Performance**: The automated workflow processes files faster when they are split logically rather than one monolithic file.
 
 ### Redirect JSON Format
 
 ```json
 {
-	"data": [
-		{
-			"utcStartTime": "",
-			"utcEndTime": "",
-			"path": "/shop/live-shopping",
-			"host": "",
-			"version": "0",
-			"redirectURL": "/s/events",
-			"operations": "",
-			"statusCode": "301",
-			"regex": 0
-		}
-	]
+ "data": [
+  {
+   "utcStartTime": "",
+   "utcEndTime": "",
+   "path": "/shop/live-shopping",
+   "host": "",
+   "version": "0",
+   "redirectURL": "/s/events",
+   "operations": "",
+   "statusCode": "301",
+   "regex": 0
+  }
+ ]
 }
 ```
 
 | Name | Required | Description |
-| :--- | :--- | :--- | 
+| :--- | :--- | :--- |
 | `utcStartTime` | No | Time in unix epoch seconds to start applying the rule. |
 | `utcEndTime` | No | Time in unix epoch seconds to stop applying the rule. |
 | `path` | Yes | The path to match on. This can be the path element of the URL or a full url. If it is the full URL the host will populate the host field below. |
@@ -207,12 +211,11 @@ To define redirects, create or edit any `.json` file within the `harper-redirect
 | `statusCode` | Yes | HTTP status code for the redirect (default: 301). |
 | `regex` | No | 1 == path is a regex. Default is 0. |
 
+* Further details on the format can be found in Harpers GitHub: <https://github.com/HarperFast/template-redirector>
 
-*   Further details on the format can be found in Harpers GitHub: https://github.com/HarperFast/template-redirector
+## 6. Commit and Push
 
-## 6. Commit and Push 
-
-Commit and push the changes to your repository. 
+Commit and push the changes to your repository.
 
 ```bash
   git add bootstrap-config.json
@@ -225,23 +228,23 @@ Commit and push the changes to your repository.
 
 The workflow is a manual dispatch process. When triggered, it performs the following steps:
 
-1.  **Harper Deployment**:
-    *   Deploys the specified redirector application to your Harper cluster.
-    *   Waits for the application to report a healthy status.
-    *   Ensures a `read_only_user` role exists.
-    *   Generates a username and password, creates this user in HarperDB, assigns the `read_only_user` role, and base64 encodes the credentials.
-2.  **EdgeWorker Build**:
-    *   Injects the base64 Harper credential token into `main.js`.
-    *   Injects the Harper Base URL into `main.js`.
-    *   Bundles and uploads the EdgeWorker to Akamai.
-    *   Activates the EdgeWorker on the Staging and Production networks.
-3.  **Property Provisioning**:
-    *   Creates the Edge Hostname via PAPI (if it does not exist).
-    *   Creates or updates the Property configuration based on the local JSON template.
-    *   Updates the hostname mappings.
-    *   Activates the Property on the Staging and Production networks.
-4.  **Data Ingestion**:
-    *   Uploads the contents of `harper-redirects/*.json` to the HarperDB instance to populate initial redirect rules.
+1. **Harper Deployment**:
+    * Deploys the specified redirector application to your Harper cluster.
+    * Waits for the application to report a healthy status.
+    * Ensures a `read_only_user` role exists.
+    * Generates a username and password, creates this user in HarperDB, assigns the `read_only_user` role, and base64 encodes the credentials.
+2. **EdgeWorker Build**:
+    * Injects the base64 Harper credential token into `main.js`.
+    * Injects the Harper Base URL into `main.js`.
+    * Bundles and uploads the EdgeWorker to Akamai.
+    * Activates the EdgeWorker on the Staging and Production networks.
+3. **Property Provisioning**:
+    * Creates the Edge Hostname via PAPI (if it does not exist).
+    * Creates or updates the Property configuration based on the local JSON template.
+    * Updates the hostname mappings.
+    * Activates the Property on the Staging and Production networks.
+4. **Data Ingestion**:
+    * Uploads the contents of `harper-redirects/*.json` to the HarperDB instance to populate initial redirect rules.
 
 ### Trigger Workflow
 
@@ -265,16 +268,17 @@ After the bootstrap workflow has completed, you can add the EdgeWorker to the Ak
 A separate workflow (`manage-harper-redirects.yml`) handles redirect updates. To trigger it, add or modify any `.json` file in the `harper-redirects/` directory (e.g., `brand-campaigns.json`, `legacy-migration.json`) and push the changes.
 
 The workflow detects which files were changed and for each file:
-1.  **Syncs Deletions**: Compares the new version to the previous commit and deletes any redirects from HarperDB that were removed from the file.
-2.  **Uploads Changes**: Uploads the current version of the file to HarperDB, adding or updating the redirects.
+
+1. **Syncs Deletions**: Compares the new version to the previous commit and deletes any redirects from HarperDB that were removed from the file.
+2. **Uploads Changes**: Uploads the current version of the file to HarperDB, adding or updating the redirects.
 
 This multi-file approach allows you to organize massive numbers of redirects (e.g., by campaign, region, or legacy site) while ensuring HarperDB remains perfectly in sync with your repository as the source of truth.
 
 > [!NOTE]
 > To ensure your Pull Requests remain readable and your Git performance stays high, we recommend keeping individual JSON files under **50,000 - 100,000 records**.
-> 
-> *   **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
-> *   **Performance**: The automated workflow processes files faster when they are split logically (e.g., `2024-marketing.json`, `legacy-site-a.json`) rather than one monolithic file.
+>
+> * **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
+> * **Performance**: The automated workflow processes files faster when they are split logically (e.g., `2024-marketing.json`, `legacy-site-a.json`) rather than one monolithic file.
 
 > [!WARNING]
 > **Mass Deletions**: Deleting a file with a large number of redirects (e.g., 50k+) will trigger the synchronization script to issue individual DELETE requests for every single record. This process is time-consuming and may lead to workflow timeouts. If you need to remove a massive number of redirects, consider doing so in smaller batches.
@@ -284,6 +288,7 @@ This multi-file approach allows you to organize massive numbers of redirects (e.
 A separate workflow is provided to update the Edgeworker. To trigger the workflow, simply modify `main.js` and push the changes to your repository. The workflow will automatically detect the changes, pull the current EW version, increment bundle.json, and deploy the Edgeworker to Akamai staging.
 
 > [!NOTE]
+>
 > * This workflow requires that you have the `EDGEWORKER_ID` variable set in your repository settings.
 > * This workflow requires that you have the `HARPER_TOKEN` secret set in your repository settings.
 > * You may gather these values from Akamai Control Center by viewing your Edgeworker in the Hamburger Menu > Edgeworkers application.
