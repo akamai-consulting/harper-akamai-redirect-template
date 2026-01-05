@@ -261,6 +261,9 @@ After the bootstrap workflow has completed, you can add the EdgeWorker to the Ak
 3. Test the redirects in staging
     * If needed, debug with Enhanced Debug Headers: [Documentation](https://techdocs.akamai.com/edgeworkers/docs/enable-enhanced-debug-headers)
 
+> [!NOTE]
+> Whenever possible, only trigger the EdgeWorker on specific paths or other match criteria to prevent uneccessary calls to HarperDB.
+
 ## Ongoing Management
 
 ### Update Redirects
