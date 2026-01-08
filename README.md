@@ -136,7 +136,6 @@ The bootstrap workflow is controlled by `bootstrap-config.json`. You must custom
 > * `akamai_property.edgeHostname`
 > * `akamai_property.originHostname`
 > * `akamai_property.sendHostHeader`
-> * `harper_app.deployUrl`
 
 ```json
 {
@@ -219,7 +218,7 @@ Commit and push the changes to your repository.
 
 ```bash
   git add bootstrap-config.json
-  git add redirects/redirects.json
+  git add harper-redirects/redirects.json
   git commit -m "Initial commit for bootstrap workflow"
   git push origin main
 ```
