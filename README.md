@@ -282,7 +282,6 @@ This multi-file approach allows you to organize massive numbers of redirects (e.
 >
 > * **Reviewable Diffs**: Smaller files allow GitHub to load diffs quickly, making deletions and changes easy to audit.
 > * **Performance**: The automated workflow processes files faster when they are split logically (e.g., `2024-marketing.json`, `legacy-site-a.json`) rather than one monolithic file.
-
 > [!WARNING]
 > **Mass Deletions**: Deleting a file with a large number of redirects (e.g., 50k+) will trigger the synchronization script to issue individual DELETE requests for every single record. This process is time-consuming and may lead to workflow timeouts. If you need to remove a massive number of redirects, consider doing so in smaller batches.
 
