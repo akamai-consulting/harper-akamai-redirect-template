@@ -242,14 +242,16 @@ jobs:
         id: create_ew
         if: ${{ steps.cfg.outputs.ew_create == 'true' }}
         run: |
-          OUT="$RUNNER_TEMP/ew.json"; ERR="$RUNNER_TEMP/ew.err"
-          
+          OUT="$RUNNER_TEMP/ew.json"
+          ERR="$RUNNER_TEMP/ew.err"
+
           # Build PM CLI account switch args
           PM_ARGS=()
           if [ -n "${ACCOUNT_SWITCH_KEY:-}" ]; then
             PM_ARGS+=(--accountkey "$ACCOUNT_SWITCH_KEY")
           fi
-          
+
+          # 1. Run the command (allow failure temporarily to capture output)
           set +e
           akamai edgeworkers register \
             --resourceTierId "${{ steps.cfg.outputs.ew_tier }}" \
@@ -257,12 +259,44 @@ jobs:
             "${{ steps.cfg.outputs.ew_name }}" \
             --jsonout \
             "${PM_ARGS[@]}" 1>"$OUT" 2>"$ERR"
+          EXIT_CODE=$?
           set -e
 
-          # strip everything before the first '{' then parse
-          EW_ID=$(sed -e '1s/^[^{]*//' "$OUT" | jq -r '.data[0].edgeWorkerId')
+          # 2. Pre-check: Did the CLI command itself fail?
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::Akamai CLI command failed (Exit Code: $EXIT_CODE)"
+            echo "=== STDOUT ==="
+            cat "$OUT"
+            echo "=== STDERR ==="
+            cat "$ERR"
+            exit 1
+          fi
 
-          [ -n "$EW_ID" ] || { echo "::error::edgeWorkerId not found"; echo "stdout:"; cat "$OUT"; echo "stderr:"; cat "$ERR"; exit 1; }
+          # 3. Clean the output (Strip potential non-JSON prefix text)
+          CLEAN_JSON=$(sed -e '1s/^[^{]*//' "$OUT")
+
+          # 4. Safe Parse: Try jq, but capture failure if JSON is malformed
+          if ! EW_ID=$(echo "$CLEAN_JSON" | jq -r '.data[0].edgeWorkerId'); then
+            echo "::error::JSON Parsing Failed. The CLI returned invalid JSON."
+            echo "=== RAW STDOUT ==="
+            cat "$OUT"
+            echo "=== CLEANED JSON ATTEMPT ==="
+            echo "$CLEAN_JSON"
+            echo "=== STDERR ==="
+            cat "$ERR"
+            exit 1
+          fi
+
+          # 5. Logic Check: JSON valid, but ID is missing/null
+          if [ -z "$EW_ID" ] || [ "$EW_ID" == "null" ]; then
+            echo "::error::edgeWorkerId not found in response"
+            echo "=== STDOUT ==="
+            cat "$OUT"
+            echo "=== STDERR ==="
+            cat "$ERR"
+            exit 1
+          fi
+
           echo "ew_id=$EW_ID" >> "$GITHUB_OUTPUT"
 
 
@@ -587,31 +621,55 @@ jobs:
           set -euo pipefail
 
           if [ -z "${HARPER_DEPLOY_URL:-}" ]; then
-            echo "::error title=Missing Harper URL for redirect upload::harper_app.deployUrl is empty in akamai/bootstrap-config.json"
+            echo "::error title=Missing Harper URL::harper_app.deployUrl is empty"
             exit 1
           fi
 
           if [ -z "${HARPER_USER:-}" ] || [ -z "${HARPER_PASSWORD:-}" ]; then
-            echo "::error title=Missing Harper secret for redirect upload::HARPER_USER or HARPER_PASSWORD is not set."
+            echo "::error title=Missing Harper Secrets::HARPER_USER or HARPER_PASSWORD is not set."
             exit 1
           fi
 
           UPLOAD_URL="${HARPER_DEPLOY_URL}/redirect"
-          
+          BATCH_SIZE=2000
+          TEMP_CHUNK="harper_chunk_payload.json"
+
           # Enable nullglob to handle case where no json files exist
           shopt -s nullglob
-          
           FILES=(harper-redirects/*.json)
-          
+
           if [ ${#FILES[@]} -eq 0 ]; then
-             echo "::warning::No JSON files found in harper-redirects/ to upload."
-             exit 0
+            echo "::warning::No JSON files found in harper-redirects/ to upload."
+            exit 0
           fi
-          
+
           for file in "${FILES[@]}"; do
-            echo "Uploading $file to ${UPLOAD_URL}..."
-            http --ignore-stdin --check-status -a "${HARPER_USER}:${HARPER_PASSWORD}" \
-              POST "${UPLOAD_URL}" \
-              Content-Type:application/json \
-              @"$file"
+            echo "Processing $file..."
+
+            # 1. Use jq to split the large 'data' array into smaller chunks
+            #    -c : Output compact JSON (one chunk per line)
+            #    We wrap the result back into { "data": [...] } structure expected by Harper
+            jq -c ".data | range(0; length; $BATCH_SIZE) as \$i | {data: .[\$i:\$i+$BATCH_SIZE]}" "$file" | \
+            while read -r chunk; do
+              
+              # 2. Write the single line chunk to a temp file
+              echo "$chunk" > "$TEMP_CHUNK"
+              
+              # 3. Upload using curl (more reliable for loops than httpie)
+              #    -f : Fail silently on HTTP errors (allows us to capture exit code)
+              #    -S : Show error message if it fails
+              #    -s : Silent mode (don't show progress bar)
+              echo "  > Uploading batch of $BATCH_SIZE records..."
+              
+              curl -fsS -u "${HARPER_USER}:${HARPER_PASSWORD}" \
+                  -H "Content-Type: application/json" \
+                  -X POST "$UPLOAD_URL" \
+                  -d @"$TEMP_CHUNK"
+                  
+            done
+            
+            echo "Finished uploading $file"
           done
+          
+          # Cleanup
+          rm -f "$TEMP_CHUNK"

@@ -43,8 +43,8 @@ jobs:
       - name: Sync and Upload Redirects
         env:
           HARPER_DEPLOY_URL: ${{ steps.config.outputs.deployUrl }}
-          HARBOR_USER: ${{ secrets.HARBOR_USER }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          HARPER_USER: ${{ secrets.HARPER_USER }}
+          HARPER_PASSWORD: ${{ secrets.HARPER_PASSWORD }}
         run: |
           cat <<EOF > sync_redirects.py
           import os
@@ -57,8 +57,9 @@ jobs:
 
           REDIRECTS_DIR = 'harper-redirects'
           DEPLOY_URL = os.environ.get('HARPER_DEPLOY_URL')
-          HARBOR_USER = os.environ.get('HARBOR_USER')
-          HARBOR_PASSWORD = os.environ.get('HARBOR_PASSWORD')
+          HARPER_USER = os.environ.get('HARPER_USER')
+          HARPER_PASSWORD = os.environ.get('HARPER_PASSWORD')
+          BATCH_SIZE = 2000 
 
           def get_git_file_content(commit, filepath):
               try:
@@ -90,7 +91,7 @@ jobs:
               to_delete = [r for r in previous_data if r['path'] not in current_paths]
               
               # Setup Auth
-              auth_str = f"{HARBOR_USER}:{HARBOR_PASSWORD}"
+              auth_str = f"{HARPER_USER}:{HARPER_PASSWORD}"
               b64_auth = base64.b64encode(auth_str.encode()).decode()
               headers = {"Authorization": f"Basic {b64_auth}", "Content-Type": "application/json"}
               ctx = ssl.create_default_context()
@@ -106,26 +107,37 @@ jobs:
                       req = urllib.request.Request(url, method='DELETE', headers=headers)
                       try:
                           urllib.request.urlopen(req, context=ctx)
-                          # print(f"  Deleted: {path}") # Reduce noise
                       except Exception as e:
                           print(f"  ::warning::Failed to delete {path}: {e}")
               else:
                   print("  No deletions found.")
 
-              # 2. Upload Logic (Upsert)
+              # 2. Upload Logic (Upsert with Chunking)
               if current_data:
-                  print(f"  Uploading {len(current_data)} rules from {filepath}...")
+                  total_records = len(current_data)
+                  print(f"  Found {total_records} rules in {filepath}. Uploading in batches of {BATCH_SIZE}...")
+                  
                   url = f"{DEPLOY_URL}/redirect"
-                  # We need to post the whole file content
-                  req = urllib.request.Request(url, method='POST', headers=headers, data=json.dumps({'data': current_data}).encode('utf-8'))
-                  try:
-                      urllib.request.urlopen(req, context=ctx)
-                      print("  Upload successful.")
-                  except Exception as e:
-                      print(f"  ::error::Failed to upload {filepath}: {e}")
+                  
+                  # Loop through data in chunks
+                  for i in range(0, total_records, BATCH_SIZE):
+                      chunk = current_data[i:i + BATCH_SIZE]
+                      chunk_num = (i // BATCH_SIZE) + 1
+                      total_chunks = (total_records + BATCH_SIZE - 1) // BATCH_SIZE
+                      
+                      print(f"    Uploading batch {chunk_num}/{total_chunks} ({len(chunk)} items)...")
+
+                      # Wrap chunk in expected format {'data': [...]}
+                      payload = json.dumps({'data': chunk}).encode('utf-8')
+                      req = urllib.request.Request(url, method='POST', headers=headers, data=payload)
+                      
+                      try:
+                          urllib.request.urlopen(req, context=ctx)
+                      except Exception as e:
+                          print(f"  ::error::Failed to upload batch {chunk_num} from {filepath}: {e}")
 
           def run():
-              if not (DEPLOY_URL and HARBOR_USER and HARBOR_PASSWORD):
+              if not (DEPLOY_URL and HARPER_USER and HARPER_PASSWORD):
                   print("::error::Missing required environment variables")
                   exit(1)
 
