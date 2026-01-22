@@ -54,100 +54,162 @@ jobs:
           import urllib.parse
           import ssl
           import base64
+          from concurrent.futures import ThreadPoolExecutor, as_completed
 
           REDIRECTS_DIR = 'harper-redirects'
           DEPLOY_URL = os.environ.get('HARPER_DEPLOY_URL')
           HARPER_USER = os.environ.get('HARPER_USER')
           HARPER_PASSWORD = os.environ.get('HARPER_PASSWORD')
-          BATCH_SIZE = 2000 
+          
+          # Configuration
+          UPLOAD_BATCH_SIZE = 2000
+          DELETE_CONCURRENCY = 15 
 
-          def get_git_file_content(commit, filepath):
+          # Setup Auth & SSL
+          AUTH_STR = f"{HARPER_USER}:{HARPER_PASSWORD}"
+          B64_AUTH = base64.b64encode(AUTH_STR.encode()).decode()
+          HEADERS = {
+              "Authorization": f"Basic {B64_AUTH}", 
+              "Content-Type": "application/json"
+          }
+          CTX = ssl.create_default_context()
+          CTX.check_hostname = False
+          CTX.verify_mode = ssl.CERT_NONE
+
+          def delete_by_id_lookup(path):
+              """
+              Two-Step Deletion:
+              1. GET /checkredirect?path=... to find the resource ID.
+              2. DELETE /rule/{id} to execute the target deletion.
+              """
               try:
-                  cmd = ['git', 'show', f'{commit}:{filepath}']
-                  val = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8')
-                  return json.loads(val)
+                  # 1. LOOKUP ID
+                  encoded_path = urllib.parse.quote(path)
+                  # Using the /checkredirect endpoint you verified
+                  lookup_url = f"{DEPLOY_URL}/checkredirect?path={encoded_path}"
+                  lookup_req = urllib.request.Request(lookup_url, method='GET', headers=HEADERS)
+                  
+                  resource_id = None
+                  try:
+                      with urllib.request.urlopen(lookup_req, context=CTX, timeout=10) as response:
+                          res_data = json.loads(response.read().decode('utf-8'))
+                          # Capture the id from the JSON object
+                          resource_id = res_data.get('id')
+                  except urllib.error.HTTPError as e:
+                      if e.code == 404:
+                          print(f"    ::warning::Path not found in Harper (already gone?): {path}")
+                          return (True, path, 404)
+                      raise e
+
+                  if not resource_id:
+                      print(f"    ::warning::ID not found in response for: {path}")
+                      return (True, path, 404)
+
+                  # 2. DELETE BY ID
+                  delete_url = f"{DEPLOY_URL}/rule/{resource_id}"
+                  delete_req = urllib.request.Request(delete_url, method='DELETE', headers=HEADERS)
+                  
+                  with urllib.request.urlopen(delete_req, context=CTX, timeout=10) as response:
+                      response.read()
+                      return (True, path, response.getcode())
+                      
+              except Exception as e:
+                  return (False, path, str(e))
+
+          def get_previous_paths_stream(commit, filepath):
+              try:
+                  cmd = f"git show {commit}:{filepath} | jq -r '.data[].path'"
+                  process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                  paths = set()
+                  for line in process.stdout:
+                      clean_line = line.decode('utf-8').strip()
+                      if clean_line:
+                          paths.add(clean_line)
+                  return paths
               except Exception:
-                  return {'data': []}
+                  return set()
 
           def get_changed_files():
-              # Detect files changed in the targeted directory
-              cmd = ['git', 'diff', '--name-only', 'HEAD~1', 'HEAD', '--', REDIRECTS_DIR]
+              cmd = ['git', 'diff', '--name-status', 'HEAD~1', 'HEAD', '--', REDIRECTS_DIR]
               output = subprocess.check_output(cmd).decode('utf-8')
-              return [f for f in output.splitlines() if f.endswith('.json')]
+              changes = []
+              for line in output.splitlines():
+                  parts = line.split('\t')
+                  if len(parts) >= 2:
+                      status = parts[0][0]
+                      path = parts[1]
+                      if path.endswith('.json'):
+                          changes.append((status, path))
+              return changes
 
-          def sync_file(filepath):
-              print(f"Processing {filepath}...")
+          def sync_file(status, filepath):
+              print(f"Processing {filepath} (Status: {status})...")
               
-              # 1. Deletions Logic
-              try:
-                  with open(filepath, 'r') as f:
-                      current_data = json.load(f).get('data', [])
-              except (FileNotFoundError, json.JSONDecodeError):
-                  current_data = []
+              current_data = []
+              current_paths = set()
 
-              previous_data = get_git_file_content('HEAD~1', filepath).get('data', [])
-              
-              current_paths = {r['path'] for r in current_data}
-              to_delete = [r for r in previous_data if r['path'] not in current_paths]
-              
-              # Setup Auth
-              auth_str = f"{HARPER_USER}:{HARPER_PASSWORD}"
-              b64_auth = base64.b64encode(auth_str.encode()).decode()
-              headers = {"Authorization": f"Basic {b64_auth}", "Content-Type": "application/json"}
-              ctx = ssl.create_default_context()
-              ctx.check_hostname = False
-              ctx.verify_mode = ssl.CERT_NONE
+              if status != 'D':
+                  try:
+                      with open(filepath, 'r') as f:
+                          current_data = json.load(f).get('data', [])
+                          current_paths = {r['path'] for r in current_data}
+                  except (FileNotFoundError, json.JSONDecodeError):
+                      current_data = []
 
-              # Execute Deletions
+              previous_paths = set()
+              if status != 'A':
+                   previous_paths = get_previous_paths_stream('HEAD~1', filepath)
+
+              to_delete = list(previous_paths - current_paths)
+              
               if to_delete:
-                  print(f"  Found {len(to_delete)} deletions.")
-                  for item in to_delete:
-                      path = item['path']
-                      url = f"{DEPLOY_URL}/rule/?path={urllib.parse.quote(path)}"
-                      req = urllib.request.Request(url, method='DELETE', headers=headers)
-                      try:
-                          urllib.request.urlopen(req, context=ctx)
-                      except Exception as e:
-                          print(f"  ::warning::Failed to delete {path}: {e}")
+                  total_del = len(to_delete)
+                  print(f"  Found {total_del} deletions. Using /checkredirect lookup...")
+                  
+                  success_count = 0
+                  with ThreadPoolExecutor(max_workers=DELETE_CONCURRENCY) as executor:
+                      future_to_path = {executor.submit(delete_by_id_lookup, p): p for p in to_delete}
+                      for i, future in enumerate(as_completed(future_to_path)):
+                          success, path, msg = future.result()
+                          if success:
+                              success_count += 1
+                          else:
+                              print(f"    ::error::Delete failed for {path}: {msg}")
+                          if (i + 1) % 500 == 0:
+                              print(f"    ...processed {i + 1}/{total_del}")
+
+                  print(f"  Deletions complete: {success_count}/{total_del} successful.")
               else:
                   print("  No deletions found.")
 
-              # 2. Upload Logic (Upsert with Chunking)
-              if current_data:
-                  total_records = len(current_data)
-                  print(f"  Found {total_records} rules in {filepath}. Uploading in batches of {BATCH_SIZE}...")
-                  
+              if status != 'D' and current_data:
+                  total_recs = len(current_data)
+                  print(f"  Uploading {total_recs} rules in batches...")
                   url = f"{DEPLOY_URL}/redirect"
                   
-                  # Loop through data in chunks
-                  for i in range(0, total_records, BATCH_SIZE):
-                      chunk = current_data[i:i + BATCH_SIZE]
-                      chunk_num = (i // BATCH_SIZE) + 1
-                      total_chunks = (total_records + BATCH_SIZE - 1) // BATCH_SIZE
-                      
-                      print(f"    Uploading batch {chunk_num}/{total_chunks} ({len(chunk)} items)...")
-
-                      # Wrap chunk in expected format {'data': [...]}
+                  for i in range(0, total_recs, UPLOAD_BATCH_SIZE):
+                      chunk = current_data[i:i + UPLOAD_BATCH_SIZE]
                       payload = json.dumps({'data': chunk}).encode('utf-8')
-                      req = urllib.request.Request(url, method='POST', headers=headers, data=payload)
-                      
+                      req = urllib.request.Request(url, method='POST', headers=HEADERS, data=payload)
                       try:
-                          urllib.request.urlopen(req, context=ctx)
+                          with urllib.request.urlopen(req, context=CTX) as response:
+                              response.read()
+                              print(f"    Batch {(i // UPLOAD_BATCH_SIZE) + 1} uploaded.")
                       except Exception as e:
-                          print(f"  ::error::Failed to upload batch {chunk_num} from {filepath}: {e}")
+                          print(f"  ::error::Upload failed: {e}")
 
           def run():
               if not (DEPLOY_URL and HARPER_USER and HARPER_PASSWORD):
-                  print("::error::Missing required environment variables")
+                  print("::error::Missing environment variables")
                   exit(1)
 
-              changed_files = get_changed_files()
-              if not changed_files:
-                  print("No .json files changed in this commit.")
+              changes = get_changed_files()
+              if not changes:
+                  print("No .json files changed.")
                   return
 
-              for f in changed_files:
-                  sync_file(f)
+              for status, f in changes:
+                  sync_file(status, f)
 
           if __name__ == '__main__':
               run()
